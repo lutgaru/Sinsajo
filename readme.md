@@ -15,6 +15,7 @@ A self-hosted real-time voice transcription system that converts speech to text 
 - ✅ **Multi-platform** - Android, iOS, Desktop (Flutter)
 - ✅ **Spanish support** - Native Spanish transcription with punctuation
 - ✅ **Self-hosted** - Run on your own hardware
+- ✅ **Audio recording** - Saves session audio as WAV files on clean
 
 ## 🏗️ Architecture
 
@@ -40,7 +41,8 @@ A self-hosted real-time voice transcription system that converts speech to text 
 2. **Voice Activity Detection** - Silero VAD v5 (ML-based) detects speech via ONNX Runtime
 3. **WebSocket Transmission** - Sends only speech chunks (not silence)
 4. **Transcription** - Rust server processes with Canary model
-5. **Display** - Client shows transcribed text in real-time
+5. **Audio Recording** - Rust server saves session as WAV to `records/` on clean
+6. **Display** - Client shows transcribed text in real-time
 
 ### Protocol
 
@@ -48,6 +50,7 @@ A self-hosted real-time voice transcription system that converts speech to text 
 - `{"type": "start", "sample_rate": 16000}` - Start session
 - Binary PCM chunks - Audio data
 - `{"type": "stop"}` - End session
+- `{"type": "clean"}` - End session and save recorded audio as WAV
 
 **Server → Client:**
 - `{"type": "transcription", "text": "..."}` - Transcribed text
@@ -348,6 +351,7 @@ let result = model.transcribe_with(
 ### In Progress 🔄
 - [ ] Streaming partial results (word-by-word)
 - [ ] Model switching UI
+- [x] Audio recording (WAV export)
 - [ ] Export transcriptions (TXT, SRT)
 - [ ] Timestamps per segment
 
