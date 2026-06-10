@@ -4,6 +4,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/audio_service.dart';
 import '../services/ws_service.dart';
+import 'settings_provider.dart';
 
 const String kWsUrl = 'ws://192.168.31.21:8765';
 
@@ -105,6 +106,7 @@ class TranscriptionNotifier extends Notifier<TranscriptionState> {
     }
 
     _ws.sendStart(sampleRate: kSampleRate);
+    _audio.gain = ref.read(settingsProvider).micGain;
     await _audio.start();
 
     _audioSub = _audio.chunks.listen((chunk) {

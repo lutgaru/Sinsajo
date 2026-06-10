@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import '../providers/transcription_provider.dart';
 import '../services/ws_service.dart';
+import 'settings_screen.dart';
 
 class TranscriptionScreen extends ConsumerWidget {
   const TranscriptionScreen({super.key});
@@ -27,7 +28,15 @@ class TranscriptionScreen extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('Whisper Local'),
         actions: [
-          // Indicador de conexión WS
+          IconButton(
+            icon: const Icon(Icons.settings),
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const SettingsScreen()),
+              );
+            },
+            tooltip: 'Ajustes',
+          ),
           Padding(
             padding: const EdgeInsets.only(right: 16),
             child: _WsStatusDot(status: state.wsStatus),

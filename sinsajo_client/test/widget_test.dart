@@ -70,19 +70,21 @@ void main() {
       );
       await tester.pump();
 
-      // Buscar los IconButton.outlined
-      final iconButtons = find.descendant(
-        of: find.byType(Row),
-        matching: find.byType(IconButton),
+      // Buscar los botones de copiar y limpiar por ícono
+      final copyIcon  = find.byIcon(Icons.copy);
+      final clearIcon = find.byIcon(Icons.delete_outline);
+      
+      expect(copyIcon,  findsOneWidget);
+      expect(clearIcon, findsOneWidget);
+      
+      final copyButton  = tester.widget<IconButton>(
+        find.ancestor(of: copyIcon, matching: find.byType(IconButton)),
       );
-
-      expect(iconButtons, findsNWidgets(2));
+      final clearButton = tester.widget<IconButton>(
+        find.ancestor(of: clearIcon, matching: find.byType(IconButton)),
+      );
       
-      // Verificar que están deshabilitados
-      final copyButton = tester.widget<IconButton>(iconButtons.first);
-      final clearButton = tester.widget<IconButton>(iconButtons.last);
-      
-      expect(copyButton.onPressed, isNull);
+      expect(copyButton.onPressed,  isNull);
       expect(clearButton.onPressed, isNull);
     });
   });

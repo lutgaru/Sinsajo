@@ -22,6 +22,8 @@ class AudioService {
   StreamSubscription? _errorSub;
   bool _isStopping = false;
 
+  double gain = 1.0;
+
   Stream<AudioChunk> get chunks => _chunkController!.stream;
   Future<bool> get hasPermission async => await _recorder.hasPermission();
 
@@ -104,10 +106,10 @@ class AudioService {
     _recorder.dispose();
   }
 
-  static Uint8List _doubleListToPcm16(List<double> samples) {
+  Uint8List _doubleListToPcm16(List<double> samples) {
     final pcm16 = Int16List(samples.length);
     for (var i = 0; i < samples.length; i++) {
-      pcm16[i] = (samples[i] * 32767).clamp(-32768, 32767).toInt();
+      pcm16[i] = (samples[i] * gain * 32767).clamp(-32768, 32767).toInt();
     }
     return Uint8List.view(pcm16.buffer);
   }
