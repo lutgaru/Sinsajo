@@ -21,22 +21,23 @@ A self-hosted real-time voice transcription system that converts speech to text 
 ```
 ┌─────────────────┐         WebSocket          ┌──────────────────┐
 │  Flutter Client │ ◄─────────────────────────► │   Rust Server    │
-│   (Dart/VAD)    │    PCM 16-bit / JSON       │ (transcribe-rs)  │
+│  (Dart/Silero)  │    PCM 16-bit / JSON       │ (transcribe-rs)  │
 └─────────────────┘                             └──────────────────┘
        │                                                  │
-       │ VAD in Isolate                                   │ ONNX Model
+       │ Silero VAD v5                                   │ ONNX Model
+       │ (ONNX Runtime)                                  │
        ▼                                                  ▼
 ┌─────────────────┐                             ┌──────────────────┐
 │  AudioService   │                             │  Canary 180M     │
-│  + RMS-based    │                             │  Flash (Int8)    │
-│     VAD Logic   │                             │                  │
+│  + vad package  │                             │  Flash (Int8)    │
+│  (ML-based)     │                             │                  │
 └─────────────────┘                             └──────────────────┘
 ```
 
 ### Data Flow
 
 1. **Audio Capture** - Flutter records PCM 16-bit @ 16kHz
-2. **Voice Activity Detection** - Isolate detects speech vs silence (RMS-based)
+2. **Voice Activity Detection** - Silero VAD v5 (ML-based) detects speech via ONNX Runtime
 3. **WebSocket Transmission** - Sends only speech chunks (not silence)
 4. **Transcription** - Rust server processes with Canary model
 5. **Display** - Client shows transcribed text in real-time
@@ -60,7 +61,7 @@ A self-hosted real-time voice transcription system that converts speech to text 
 - **State Management**: Riverpod 2.x
 - **Audio**: `record` package
 - **WebSocket**: `web_socket_channel`
-- **VAD**: Custom RMS-based implementation in Dart Isolate
+- **VAD**: Silero VAD v5 via [`vad`](https://pub.dev/packages/vad) package (ML-based, ONNX Runtime)
 
 ### Server (Rust)
 - **Runtime**: Tokio (async)
@@ -154,20 +155,24 @@ const String kWsUrl = 'ws://192.168.1.100:8765';  // ← Your server IP
 
 ### VAD Configuration
 
-Edit `sinsajo_client/lib/services/audio_service.dart`:
+VAD is handled by the [`vad`](https://pub.dev/packages/vad) package (Silero VAD v5 via ONNX Runtime). Parameters are passed to `VadHandler.startListening()` in `sinsajo_client/lib/services/audio_service.dart`:
 
 ```dart
-const int    kSilenceMs      = 400;   // Silence duration to end utterance
-const int    kMinSpeechMs    = 400;   // Minimum speech duration
-const double kSnrMargin      = 3.5;   // SNR threshold multiplier
-const double kAbsMinRms      = 0.008; // Minimum absolute RMS
-const int    kHangoverFrames = 3;     // Extra frames after silence
+await _vadHandler.startListening(
+  model: 'v5',                          // Silero VAD v5
+  frameSamples: 512,                     // 32ms frames
+  positiveSpeechThreshold: 0.5,          // Probability threshold to start speech
+  negativeSpeechThreshold: 0.35,         // Probability threshold to end speech
+  redemptionFrames: 8,                   // Silence frames needed to end utterance
+  preSpeechPadFrames: 1,                 // Frames of pre-roll before speech
+  minSpeechFrames: 3,                    // Minimum speech frames to emit
+);
 ```
 
 **Tuning tips:**
-- Lower `kSnrMargin` (2.5) for noisy environments
-- Increase `kSilenceMs` (600) to avoid cutting words
-- Decrease `kMinSpeechMs` (200) for faster response
+- Lower `positiveSpeechThreshold` (0.3) for quieter voices
+- Lower `negativeSpeechThreshold` (0.2) to keep segments longer
+- Increase `redemptionFrames` (12) to avoid cutting pauses within speech
 
 ## 📊 Performance
 
@@ -219,13 +224,11 @@ case 'final':
 
 **Problem**: App crashes when pressing stop then start again
 
-**Solution**: Ensure `AudioService._cleanup()` properly cancels all subscriptions:
+**Solution**: Ensure `AudioService._cleanup()` properly disposes the `VadHandler`:
 
 ```dart
 Future<void> _cleanup() async {
-  await _isoOutSub?.cancel();
-  _isolate?.kill(priority: Isolate.immediate);
-  _isoOut?.close();
+  await _stopVad();
   await _chunkController?.close();
 }
 ```
@@ -234,11 +237,12 @@ Future<void> _cleanup() async {
 
 **Problem**: No chunks are sent even when speaking
 
-**Solution**: Adjust VAD thresholds:
+**Solution**: Adjust VAD probability thresholds passed to `VadHandler.startListening()`:
 
 ```dart
-const double kSnrMargin = 2.5;    // Lower for noisy environments
-const double kAbsMinRMS = 0.005;  // Lower for quiet voices
+positiveSpeechThreshold: 0.3,   // Lower for quieter speakers
+negativeSpeechThreshold: 0.2,   // Lower to keep segments longer
+minSpeechFrames: 2,             // Lower for faster response
 ```
 
 ### Server connection failed
@@ -358,11 +362,10 @@ let result = model.transcribe_with(
 ## 🐛 Known Limitations
 
 - Requires WiFi/LAN connection (no mobile data without port forwarding)
-- VAD may cut words if threshold is too aggressive
 - Int8 model has ~2% lower accuracy than Float32
 - Single language per session (no mixed languages)
 - No authentication (local network only)
-- Model loading takes ~2-3 seconds on first run
+- Model and ONNX Runtime loading takes ~2-3 seconds on first run
 
 ## 📄 License
 
