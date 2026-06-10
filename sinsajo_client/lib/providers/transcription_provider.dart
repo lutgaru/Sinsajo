@@ -1,22 +1,16 @@
 // lib/providers/transcription_provider.dart
-//
-// Orquesta AudioService + WsService con Riverpod 2.x
-// Usa Notifier + NotifierProvider (StateNotifier fue removido en Riverpod 2)
 
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/audio_service.dart';
 import '../services/ws_service.dart';
 
-// ── Config ────────────────────────────────────────
-const String kWsUrl = 'ws://192.168.1.100:8765';  // ← cambia a la IP del servidor
-
-// ── Estado de la sesión ───────────────────────────
+const String kWsUrl = 'ws://192.168.31.21:8765';
 
 class TranscriptionState {
   final bool isRecording;
   final WsStatus wsStatus;
-  final List<String> segments;   // partials acumulados
+  final List<String> segments;
   final String? error;
 
   const TranscriptionState({
@@ -42,47 +36,34 @@ class TranscriptionState {
       );
 }
 
-// ── Notifier ──────────────────────────────────────
-// Riverpod 2.x: extender Notifier<T> en lugar de StateNotifier<T>
-// - build() reemplaza al constructor para la inicialización
-// - state es accesible directamente dentro del Notifier
-
 class TranscriptionNotifier extends Notifier<TranscriptionState> {
   late final WsService    _ws;
   late final AudioService _audio;
   StreamSubscription?     _audioSub;
+  StreamSubscription?     _wsStatusSub;
+  StreamSubscription?     _wsMessageSub;
 
   @override
   TranscriptionState build() {
-    // build() es el nuevo "constructor" en Riverpod 2.x
-    // Se llama automáticamente al crear el provider
     _ws    = WsService(url: kWsUrl);
     _audio = AudioService();
 
-    // Cleanup automático cuando el provider se destruye
     ref.onDispose(() {
       _audioSub?.cancel();
+      _wsStatusSub?.cancel();
+      _wsMessageSub?.cancel();
       _audio.dispose();
       _ws.dispose();
     });
 
-    _listenWsStatus();
-    _listenWsMessages();
-
-    return const TranscriptionState();
-  }
-
-  // ── WebSocket listeners ──────────────────────────
-
-  void _listenWsStatus() {
-    _ws.statusStream.listen((s) {
+    _wsStatusSub = _ws.statusStream.listen((s) {
       state = state.copyWith(wsStatus: s);
     });
-  }
 
-  void _listenWsMessages() {
-    _ws.messageStream.listen((msg) {
+    _wsMessageSub = _ws.messageStream.listen((msg) {
+      print('[WS] ← Recibido: type=${msg.type}, content=${msg.content}');
       switch (msg.type) {
+        case 'transcription': // ← AGREGADO: acepta "transcription" del servidor Rust
         case 'partial':
         case 'final':
           if (msg.content.isNotEmpty) {
@@ -90,15 +71,20 @@ class TranscriptionNotifier extends Notifier<TranscriptionState> {
               segments: [...state.segments, msg.content],
             );
           }
+          break;
         case 'error':
           state = state.copyWith(error: msg.content);
+          break;
+        case 'status':
+          // Ignorar mensajes de status
+          break;
         default:
           break;
       }
     });
-  }
 
-  // ── Public API ───────────────────────────────────
+    return const TranscriptionState();
+  }
 
   Future<void> connect() async {
     await _ws.connect();
@@ -115,12 +101,15 @@ class TranscriptionNotifier extends Notifier<TranscriptionState> {
 
     if (state.wsStatus != WsStatus.connected) {
       await _ws.connect();
+      // Esperar un poco para que la conexión se establezca
+      await Future.delayed(const Duration(milliseconds: 500));
     }
 
     _ws.sendStart(sampleRate: kSampleRate);
     await _audio.start();
 
     _audioSub = _audio.chunks.listen((chunk) {
+      print('[Audio] → Enviando chunk: ${chunk.pcmBytes.length} bytes, isFinal=${chunk.isFinal}');
       _ws.sendAudioChunk(chunk.pcmBytes);
     });
 
@@ -130,8 +119,14 @@ class TranscriptionNotifier extends Notifier<TranscriptionState> {
   Future<void> stopRecording() async {
     if (!state.isRecording) return;
 
+    // Cancelar suscripción de audio PRIMERO
     await _audioSub?.cancel();
+    _audioSub = null;
+
+    // Detener grabación
     await _audio.stop();
+    
+    // Enviar stop al servidor
     _ws.sendStop();
 
     state = state.copyWith(isRecording: false);
@@ -141,9 +136,6 @@ class TranscriptionNotifier extends Notifier<TranscriptionState> {
     state = state.copyWith(segments: []);
   }
 }
-
-// ── Provider ──────────────────────────────────────
-// NotifierProvider reemplaza a StateNotifierProvider en Riverpod 2.x
 
 final transcriptionProvider =
     NotifierProvider<TranscriptionNotifier, TranscriptionState>(

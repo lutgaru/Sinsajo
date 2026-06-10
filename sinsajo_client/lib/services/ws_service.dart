@@ -1,10 +1,4 @@
 // lib/services/ws_service.dart
-//
-// Maneja la conexión WebSocket con el wrapper Python.
-// Protocolo:
-//   → JSON  { "type": "start" | "stop" | "ping" }
-//   → BINARY  raw PCM int16
-//   ← JSON  { "type": "partial"|"final"|"error"|"status", "text"|"message": "..." }
 
 import 'dart:async';
 import 'dart:convert';
@@ -14,7 +8,7 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 enum WsStatus { disconnected, connecting, connected, error }
 
 class WsMessage {
-  final String type;     // partial, final, error, status, pong
+  final String type;
   final String content;
   WsMessage(this.type, this.content);
 }
@@ -36,10 +30,6 @@ class WsService {
 
   WsService({required this.url});
 
-  // ────────────────────────────────────────────────
-  // Connect / Disconnect
-  // ────────────────────────────────────────────────
-
   Future<void> connect() async {
     if (_status == WsStatus.connected) return;
 
@@ -50,18 +40,22 @@ class WsService {
       await _channel!.ready;
 
       _setStatus(WsStatus.connected);
+      print('[WS] ✅ Conectado a $url');
 
       _sub = _channel!.stream.listen(
         _onMessage,
         onError: (e) {
+          print('[WS] ❌ Error: $e');
           _setStatus(WsStatus.error);
           _messageController.add(WsMessage('error', e.toString()));
         },
         onDone: () {
+          print('[WS] 🔌 Desconectado');
           _setStatus(WsStatus.disconnected);
         },
       );
     } catch (e) {
+      print('[WS] ❌ Connection failed: $e');
       _setStatus(WsStatus.error);
       _messageController.add(WsMessage('error', 'Connection failed: $e'));
     }
@@ -74,10 +68,6 @@ class WsService {
     _setStatus(WsStatus.disconnected);
   }
 
-  // ────────────────────────────────────────────────
-  // Send
-  // ────────────────────────────────────────────────
-
   void sendStart({int sampleRate = 16000}) {
     _sendJson({'type': 'start', 'sample_rate': sampleRate});
   }
@@ -87,29 +77,35 @@ class WsService {
   }
 
   void sendAudioChunk(Uint8List pcmBytes) {
-    if (_status != WsStatus.connected) return;
+    if (_status != WsStatus.connected) {
+      print('[WS] ⚠ Audio no enviado: no conectado');
+      return;
+    }
     _channel?.sink.add(pcmBytes);
   }
 
-  // ────────────────────────────────────────────────
-  // Internal
-  // ────────────────────────────────────────────────
-
   void _sendJson(Map<String, dynamic> msg) {
-    if (_status != WsStatus.connected) return;
+    if (_status != WsStatus.connected) {
+      print('[WS] ⚠ JSON no enviado: no conectado');
+      return;
+    }
+    print('[WS] → Enviando: $msg');
     _channel?.sink.add(jsonEncode(msg));
   }
 
   void _onMessage(dynamic raw) {
-    if (raw is! String) return;
+    if (raw is! String) {
+      print('[WS] ← Mensaje no-string recibido');
+      return;
+    }
 
     try {
       final map  = jsonDecode(raw) as Map<String, dynamic>;
       final type = map['type'] as String? ?? 'unknown';
       final text = (map['text'] ?? map['message'] ?? '') as String;
       _messageController.add(WsMessage(type, text));
-    } catch (_) {
-      // ignore malformed
+    } catch (e) {
+      print('[WS] ⚠ Error parseando mensaje: $e');
     }
   }
 
