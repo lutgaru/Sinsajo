@@ -56,9 +56,9 @@ class AudioService {
       model: 'v5',
       frameSamples: 512,
       positiveSpeechThreshold: 0.5,
-      negativeSpeechThreshold: 0.35,
-      redemptionFrames: 8,
-      preSpeechPadFrames: 1,
+      negativeSpeechThreshold: 0.38,
+      redemptionFrames: 4,
+      preSpeechPadFrames: 2,
       minSpeechFrames: 3,
     );
 
