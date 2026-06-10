@@ -28,10 +28,12 @@ class WsService {
   WsStatus _status = WsStatus.disconnected;
   WsStatus get status => _status;
 
+  bool _isDisposed = false;
+
   WsService({required this.url});
 
   Future<void> connect() async {
-    if (_status == WsStatus.connected) return;
+    if (_status == WsStatus.connected || _isDisposed) return;
 
     _setStatus(WsStatus.connecting);
 
@@ -62,9 +64,14 @@ class WsService {
   }
 
   Future<void> disconnect() async {
+    if (_isDisposed) return;
+    
     await _sub?.cancel();
+    _sub = null;
+    
     await _channel?.sink.close();
     _channel = null;
+    
     _setStatus(WsStatus.disconnected);
   }
 
@@ -85,7 +92,7 @@ class WsService {
   }
 
   void _sendJson(Map<String, dynamic> msg) {
-    if (_status != WsStatus.connected) {
+    if (_status != WsStatus.connected || _isDisposed) {
       print('[WS] ⚠ JSON no enviado: no conectado');
       return;
     }
@@ -94,7 +101,7 @@ class WsService {
   }
 
   void _onMessage(dynamic raw) {
-    if (raw is! String) {
+    if (raw is! String || _isDisposed) {
       print('[WS] ← Mensaje no-string recibido');
       return;
     }
@@ -110,11 +117,13 @@ class WsService {
   }
 
   void _setStatus(WsStatus s) {
+    if (_isDisposed) return;
     _status = s;
     _statusController.add(s);
   }
 
   void dispose() {
+    _isDisposed = true;
     disconnect();
     _statusController.close();
     _messageController.close();

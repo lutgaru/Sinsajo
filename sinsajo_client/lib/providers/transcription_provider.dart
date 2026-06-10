@@ -27,12 +27,13 @@ class TranscriptionState {
     WsStatus?     wsStatus,
     List<String>? segments,
     String?       error,
+    bool          clearError = false,
   }) =>
       TranscriptionState(
         isRecording: isRecording ?? this.isRecording,
         wsStatus:    wsStatus    ?? this.wsStatus,
         segments:    segments    ?? this.segments,
-        error:       error,
+        error:       clearError ? null : (error ?? this.error),
       );
 }
 
@@ -63,7 +64,7 @@ class TranscriptionNotifier extends Notifier<TranscriptionState> {
     _wsMessageSub = _ws.messageStream.listen((msg) {
       print('[WS] ← Recibido: type=${msg.type}, content=${msg.content}');
       switch (msg.type) {
-        case 'transcription': // ← AGREGADO: acepta "transcription" del servidor Rust
+        case 'transcription':
         case 'partial':
         case 'final':
           if (msg.content.isNotEmpty) {
@@ -76,7 +77,6 @@ class TranscriptionNotifier extends Notifier<TranscriptionState> {
           state = state.copyWith(error: msg.content);
           break;
         case 'status':
-          // Ignorar mensajes de status
           break;
         default:
           break;
@@ -101,7 +101,6 @@ class TranscriptionNotifier extends Notifier<TranscriptionState> {
 
     if (state.wsStatus != WsStatus.connected) {
       await _ws.connect();
-      // Esperar un poco para que la conexión se establezca
       await Future.delayed(const Duration(milliseconds: 500));
     }
 
@@ -113,20 +112,16 @@ class TranscriptionNotifier extends Notifier<TranscriptionState> {
       _ws.sendAudioChunk(chunk.pcmBytes);
     });
 
-    state = state.copyWith(isRecording: true, error: null);
+    state = state.copyWith(isRecording: true, clearError: true);
   }
 
   Future<void> stopRecording() async {
     if (!state.isRecording) return;
 
-    // Cancelar suscripción de audio PRIMERO
     await _audioSub?.cancel();
     _audioSub = null;
 
-    // Detener grabación
     await _audio.stop();
-    
-    // Enviar stop al servidor
     _ws.sendStop();
 
     state = state.copyWith(isRecording: false);
