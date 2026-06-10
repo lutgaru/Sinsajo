@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 import '../providers/transcription_provider.dart';
 import '../services/ws_service.dart';
 
@@ -13,6 +14,14 @@ class TranscriptionScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final state    = ref.watch(transcriptionProvider);
     final notifier = ref.read(transcriptionProvider.notifier);
+
+    ref.listen(transcriptionProvider.select((s) => s.isRecording), (prev, next) {
+      if (next) {
+        WakelockPlus.enable();
+      } else {
+        WakelockPlus.disable();
+      }
+    });
 
     return Scaffold(
       appBar: AppBar(
