@@ -87,6 +87,17 @@ async fn handle_connection(
                             .send(Message::Text(serde_json::to_string(&response).unwrap()))
                             .await;
                     }
+                    "clean" => {
+                        let response = ServerMessage {
+                            msg_type: "status".to_string(),
+                            text: None,
+                            message: Some("cleaned".to_string()),
+                        };
+                        let mut w = write.lock().await;
+                        let _ = w
+                            .send(Message::Text(serde_json::to_string(&response).unwrap()))
+                            .await;
+                    }
                     _ => {}
                 }
             }

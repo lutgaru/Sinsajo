@@ -83,6 +83,10 @@ class WsService {
     _sendJson({'type': 'stop'});
   }
 
+  void sendClean() {
+    _sendJson({'type': 'clean'});
+  }
+
   void sendAudioChunk(Uint8List pcmBytes) {
     if (_status != WsStatus.connected) {
       print('[WS] ⚠ Audio no enviado: no conectado');

@@ -34,6 +34,7 @@ class _AudioData extends _IsoMsg {
 }
 
 class _StopMsg extends _IsoMsg {}
+class _CleanMsg extends _IsoMsg {}
 
 sealed class _IsoReply {}
 
@@ -125,6 +126,18 @@ class _VadProcessor {
     }
   }
 
+  void reset() {
+    _speechBuf.clear();
+    _noiseHistory.clear();
+    _silenceBytes = 0;
+    _hangover     = 0;
+    _inSpeech     = false;
+    _calibrated   = false;
+    _noiseFloor   = kAbsMinRms;
+    _totalBytes   = 0;
+    _calibBytes   = 0;
+  }
+
   void finish() => _flush(final_: true);
 
   void _flush({required bool final_}) {
@@ -173,6 +186,9 @@ void _vadIsolate(SendPort outPort) {
       }
       vad.finish();
       recv.close();
+    } else if (msg is _CleanMsg) {
+      batchBuf.clear();
+      vad.reset();
     }
   });
 }
@@ -230,18 +246,23 @@ class AudioService {
     print('[Audio] Grabacion iniciada');
   }
 
+  Future<void> clean() async {
+    _isoIn?.send(_CleanMsg());
+    _isoIn?.send(_StopMsg());
+
+    await Future.delayed(const Duration(milliseconds: 50));
+
+    await _cleanup();
+    print('[Audio] Estado limpiado');
+  }
+
   Future<void> stop() async {
     await _rawSub?.cancel();
     _rawSub = null;
-    
+
     await _recorder.stop();
-    
-    _isoIn?.send(_StopMsg());
-    
-    // Esperar un poco para que el isolate procese el último batch
-    await Future.delayed(const Duration(milliseconds: 500));
-    
-    await _cleanup();
+
+    await clean();
     print('[Audio] Grabacion detenida');
   }
 

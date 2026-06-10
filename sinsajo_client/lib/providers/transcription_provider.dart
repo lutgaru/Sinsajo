@@ -123,6 +123,7 @@ class TranscriptionNotifier extends Notifier<TranscriptionState> {
 
     await _audio.stop();
     _ws.sendStop();
+    _ws.sendClean();
 
     state = state.copyWith(isRecording: false);
   }
