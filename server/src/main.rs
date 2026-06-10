@@ -1,8 +1,11 @@
 use futures_util::{SinkExt, StreamExt};
+use hound;
 use serde::{Deserialize, Serialize};
+use std::fs;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::time::SystemTime;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::Mutex;
 use tokio_tungstenite::accept_async;
@@ -45,6 +48,9 @@ async fn handle_connection(
     let (mut write, mut read) = ws_stream.split();
     let write = Arc::new(Mutex::new(write));
 
+    let _ = fs::create_dir_all("records");
+    let mut audio_buffer: Vec<f32> = Vec::new();
+
     while let Some(msg) = read.next().await {
         match msg {
             Ok(Message::Text(text)) => {
@@ -66,6 +72,7 @@ async fn handle_connection(
 
                 match client_msg.msg_type.as_str() {
                     "start" => {
+                        audio_buffer.clear();
                         let response = ServerMessage {
                             msg_type: "status".to_string(),
                             text: None,
@@ -88,6 +95,28 @@ async fn handle_connection(
                             .await;
                     }
                     "clean" => {
+                        if !audio_buffer.is_empty() {
+                            let timestamp = SystemTime::now()
+                                .duration_since(SystemTime::UNIX_EPOCH)
+                                .unwrap()
+                                .as_millis();
+                            let filename = format!("records/{}.wav", timestamp);
+                            let spec = hound::WavSpec {
+                                channels: 1,
+                                sample_rate: 16000,
+                                bits_per_sample: 16,
+                                sample_format: hound::SampleFormat::Int,
+                            };
+                            if let Ok(mut writer) = hound::WavWriter::create(&filename, spec) {
+                                for &sample in &audio_buffer {
+                                    let sample_i16 = (sample * 32768.0) as i16;
+                                    let _ = writer.write_sample(sample_i16);
+                                }
+                                let _ = writer.finalize();
+                                println!("💾 Audio guardado: {}", filename);
+                            }
+                            audio_buffer.clear();
+                        }
                         let response = ServerMessage {
                             msg_type: "status".to_string(),
                             text: None,
@@ -114,6 +143,8 @@ async fn handle_connection(
                     .iter()
                     .map(|&s| s as f32 / 32768.0)
                     .collect();
+
+                audio_buffer.extend_from_slice(&samples);
 
                 let duration_ms = samples.len() as f32 / 16000.0 * 1000.0;
                 println!("📥 Chunk recibido: {:.0}ms ({} samples)", duration_ms, samples.len());
