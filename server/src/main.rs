@@ -10,8 +10,11 @@ use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::{Mutex, Notify, Semaphore};
 use tokio_tungstenite::accept_async;
 use tokio_tungstenite::tungstenite::Message;
-use transcribe_rs::onnx::canary::{CanaryModel, CanaryParams};
+use transcribe_rs::onnx::canary::CanaryModel;
+use transcribe_rs::onnx::parakeet::ParakeetModel;
 use transcribe_rs::onnx::Quantization;
+use transcribe_rs::SpeechModel;
+use transcribe_rs::TranscribeOptions;
 
 #[derive(Debug, Deserialize)]
 struct ClientMessage {
@@ -29,6 +32,14 @@ struct ServerMessage {
     #[serde(skip_serializing_if = "Option::is_none")]
     message: Option<String>,
 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ModelKind {
+    Canary180M,
+    ParakeetTDT,
+}
+
+const MODEL_KIND: ModelKind = ModelKind::ParakeetTDT;
 
 // Alias para el sink compartido entre el loop principal y las tareas de transcripción
 type WsSink = Arc<
@@ -68,27 +79,20 @@ async fn save_audio(audio_buffer: &[f32]) {
 
 async fn transcribe_and_send(
     samples: Vec<f32>,
-    model: Arc<Mutex<CanaryModel>>,
+    model: Arc<Mutex<Box<dyn SpeechModel + Send>>>,
     sem: Arc<Semaphore>,
     write: WsSink,
 ) {
-    // El permiso serializa las inferencias: solo 1 a la vez
-    // acquire_owned() mueve el permiso al async block, se libera al salir
     let _permit = match sem.acquire_owned().await {
         Ok(p) => p,
         Err(_) => return,
     };
 
     let mut lock = model.lock().await;
-    match lock.transcribe_with(
-        &samples,
-        &CanaryParams {
-            language: Some("en".to_string()),
-            use_pnc: true,
-            use_itn: true,
-            ..Default::default()
-        },
-    ) {
+    match lock.transcribe(&samples, &TranscribeOptions {
+        language: Some("en".to_string()),
+        ..Default::default()
+    }) {
         Ok(result) => {
             let text = result.text.trim().to_string();
             if !text.is_empty() {
@@ -124,7 +128,7 @@ async fn transcribe_and_send(
 async fn handle_connection(
     stream: TcpStream,
     addr: SocketAddr,
-    model: Arc<Mutex<CanaryModel>>,
+    model: Arc<Mutex<Box<dyn SpeechModel + Send>>>,
     sem: Arc<Semaphore>,
     shutdown: Arc<Notify>,
 ) {
@@ -212,7 +216,7 @@ async fn handle_connection(
                         audio_buffer.extend_from_slice(&samples);
 
                         // ── Transcripción en tarea separada ───────────────
-                        // El loop de lectura NO se bloquea. Mientras Canary
+                        // El loop de lectura NO se bloquea. Mientras el modelo
                         // procesa el chunk, seguimos recibiendo audio.
                         // El Semaphore(1) garantiza que solo una inferencia
                         // corre a la vez (evita OOM y resultados desordenados).
@@ -258,16 +262,32 @@ async fn handle_connection(
 
 #[tokio::main]
 async fn main() {
-    println!("🚀 Cargando modelo Canary 180M Flash...");
-
-    let model = match CanaryModel::load(
-        &PathBuf::from("models/canary-180m-flash-onnx"),
-        &Quantization::Int8,
-    ) {
-        Ok(m) => Arc::new(Mutex::new(m)),
-        Err(e) => {
-            eprintln!("❌ Error cargando modelo: {}", e);
-            return;
+    let model: Arc<Mutex<Box<dyn SpeechModel + Send>>> = match MODEL_KIND {
+        ModelKind::Canary180M => {
+            println!("🚀 Cargando modelo Canary 180M Flash...");
+            match CanaryModel::load(
+                &PathBuf::from("models/canary-180m-flash-onnx"),
+                &Quantization::Int8,
+            ) {
+                Ok(m) => Arc::new(Mutex::new(Box::new(m) as Box<dyn SpeechModel + Send>)),
+                Err(e) => {
+                    eprintln!("❌ Error cargando Canary: {}", e);
+                    return;
+                }
+            }
+        }
+        ModelKind::ParakeetTDT => {
+            println!("🚀 Cargando modelo Parakeet TDT 0.6b v3...");
+            match ParakeetModel::load(
+                &PathBuf::from("models/parakeet-tdt-0.6b-v3-onnx"),
+                &Quantization::Int8,
+            ) {
+                Ok(m) => Arc::new(Mutex::new(Box::new(m) as Box<dyn SpeechModel + Send>)),
+                Err(e) => {
+                    eprintln!("❌ Error cargando Parakeet: {}", e);
+                    return;
+                }
+            }
         }
     };
 
