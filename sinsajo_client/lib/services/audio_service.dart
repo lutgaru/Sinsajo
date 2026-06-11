@@ -63,10 +63,11 @@ class AudioService {
       model: 'v5',
       frameSamples: 512,
       positiveSpeechThreshold: 0.45,
-      negativeSpeechThreshold: 0.38,
+      negativeSpeechThreshold: 0.35,
       redemptionFrames: 7,
-      preSpeechPadFrames: 5,
-      minSpeechFrames: 6,
+      preSpeechPadFrames: 8,
+      minSpeechFrames: 8,
+      endSpeechPadFrames: 3,
     );
 
     print('[Audio] Grabacion iniciada (Silero VAD v5)');
