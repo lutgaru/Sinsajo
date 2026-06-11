@@ -8,11 +8,38 @@ import '../providers/transcription_provider.dart';
 import '../services/ws_service.dart';
 import 'settings_screen.dart';
 
-class TranscriptionScreen extends ConsumerWidget {
+class TranscriptionScreen extends ConsumerStatefulWidget {
   const TranscriptionScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<TranscriptionScreen> createState() =>
+      _TranscriptionScreenState();
+}
+
+class _TranscriptionScreenState extends ConsumerState<TranscriptionScreen>
+    with WidgetsBindingObserver {
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      ref.read(transcriptionProvider.notifier).reconnectIfNeeded();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final state    = ref.watch(transcriptionProvider);
     final notifier = ref.read(transcriptionProvider.notifier);
 

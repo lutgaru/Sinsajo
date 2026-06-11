@@ -28,13 +28,25 @@ class WsService {
   WsStatus _status = WsStatus.disconnected;
   WsStatus get status => _status;
 
-  bool _isDisposed = false;
+  bool _isDisposed          = false;
+  bool _intentionalDisconnect = false;
+
+  Timer?  _reconnectTimer;
+  int     _reconnectAttempts = 0;
+  static const int     _maxReconnectAttempts = 10;
+  static const Duration _reconnectDelay      = Duration(seconds: 2);
 
   WsService({required this.url});
 
   Future<void> connect() async {
     if (_status == WsStatus.connected || _isDisposed) return;
 
+    _sub?.cancel();
+    _sub = null;
+    await _channel?.sink.close();
+    _channel = null;
+
+    _intentionalDisconnect = false;
     _setStatus(WsStatus.connecting);
 
     try {
@@ -42,6 +54,7 @@ class WsService {
       await _channel!.ready;
 
       _setStatus(WsStatus.connected);
+      _reconnectAttempts = 0;
       print('[WS] ✅ Conectado a $url');
 
       _sub = _channel!.stream.listen(
@@ -50,28 +63,54 @@ class WsService {
           print('[WS] ❌ Error: $e');
           _setStatus(WsStatus.error);
           _messageController.add(WsMessage('error', e.toString()));
+          _scheduleReconnect();
         },
         onDone: () {
           print('[WS] 🔌 Desconectado');
           _setStatus(WsStatus.disconnected);
+          if (!_intentionalDisconnect && !_isDisposed) {
+            _scheduleReconnect();
+          }
         },
       );
     } catch (e) {
       print('[WS] ❌ Connection failed: $e');
       _setStatus(WsStatus.error);
       _messageController.add(WsMessage('error', 'Connection failed: $e'));
+      if (!_intentionalDisconnect && !_isDisposed) {
+        _scheduleReconnect();
+      }
     }
+  }
+
+  void _scheduleReconnect() {
+    if (_isDisposed || _intentionalDisconnect) return;
+    if (_reconnectAttempts >= _maxReconnectAttempts) {
+      print('[WS] ⚠ Máximo de reintentos alcanzado');
+      return;
+    }
+    _reconnectTimer?.cancel();
+    _reconnectAttempts++;
+    print('[WS] 🔄 Reintentando en ${_reconnectDelay.inSeconds}s '
+        '(intento $_reconnectAttempts/$_maxReconnectAttempts)');
+    _reconnectTimer = Timer(_reconnectDelay, () {
+      if (!_isDisposed && !_intentionalDisconnect) {
+        connect();
+      }
+    });
   }
 
   Future<void> disconnect() async {
     if (_isDisposed) return;
-    
+    _intentionalDisconnect = true;
+    _reconnectTimer?.cancel();
+
     await _sub?.cancel();
     _sub = null;
-    
+
     await _channel?.sink.close();
     _channel = null;
-    
+
     _setStatus(WsStatus.disconnected);
   }
 

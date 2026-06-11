@@ -93,6 +93,13 @@ class TranscriptionNotifier extends Notifier<TranscriptionState> {
     await _ws.connect();
   }
 
+  Future<void> reconnectIfNeeded() async {
+    if (_ws.status != WsStatus.connected) {
+      print('[WS] 🔄 Reconectando por cambio de lifecycle');
+      await _ws.connect();
+    }
+  }
+
   Future<void> startRecording() async {
     if (state.isRecording) return;
 
