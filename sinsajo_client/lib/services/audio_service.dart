@@ -4,8 +4,8 @@ import 'package:record/record.dart';
 import 'package:vad/vad.dart';
 
 const int kSampleRate = 16000;
-const int kChannels   = 1;
-const int kBitDepth   = 16;
+const int kChannels = 1;
+const int kBitDepth = 16;
 
 class AudioChunk {
   final Uint8List pcmBytes;
@@ -17,12 +17,16 @@ class AudioService {
   final AudioRecorder _recorder = AudioRecorder();
   StreamController<AudioChunk>? _chunkController;
 
-  VadHandler?  _vadHandler;
+  VadHandler? _vadHandler;
   StreamSubscription? _speechEndSub;
   StreamSubscription? _errorSub;
   bool _isStopping = false;
 
   double gain = 1.0;
+  double threshold = 0.15; // a partir de qué nivel comprime
+  double ratio = 4.0; // cuánto comprime los picos (4:1)
+  double makeupGain = 2; // ganancia aplicada después de comprimir
+  double knee = 0.05; // transición suave en el threshold
 
   Stream<AudioChunk> get chunks => _chunkController!.stream;
   Future<bool> get hasPermission async => await _recorder.hasPermission();
@@ -50,6 +54,7 @@ class AudioService {
         encoder: AudioEncoder.pcm16bits,
         sampleRate: kSampleRate,
         numChannels: kChannels,
+        autoGain: true,
       ),
     );
 
@@ -57,11 +62,11 @@ class AudioService {
       audioStream: stream,
       model: 'v5',
       frameSamples: 512,
-      positiveSpeechThreshold: 0.5,
+      positiveSpeechThreshold: 0.45,
       negativeSpeechThreshold: 0.38,
-      redemptionFrames: 4,
-      preSpeechPadFrames: 2,
-      minSpeechFrames: 3,
+      redemptionFrames: 7,
+      preSpeechPadFrames: 5,
+      minSpeechFrames: 6,
     );
 
     print('[Audio] Grabacion iniciada (Silero VAD v5)');
@@ -78,7 +83,7 @@ class AudioService {
     _isStopping = true;
     await _recorder.stop();
     await _stopVad();
-    _chunkController?.add(AudioChunk(Uint8List(0), isFinal: true));
+    await _chunkController?.close();
     print('[Audio] Grabacion detenida');
   }
 
@@ -109,8 +114,31 @@ class AudioService {
   Uint8List _doubleListToPcm16(List<double> samples) {
     final pcm16 = Int16List(samples.length);
     for (var i = 0; i < samples.length; i++) {
-      pcm16[i] = (samples[i] * gain * 32767).clamp(-32768, 32767).toInt();
+      final compressed = _compress(samples[i]);
+      pcm16[i] = compressed.clamp(-1.0, 1.0).mul32767();
     }
     return Uint8List.view(pcm16.buffer);
   }
+
+  double _compress(double x) {
+    final abs = x.abs();
+    double gainReduction = 1.0;
+    final halfKnee = knee / 2;
+
+    if (knee > 0 && abs > threshold - halfKnee && abs < threshold + halfKnee) {
+      // zona de soft knee: transición suave
+      final t = (abs - (threshold - halfKnee)) / knee;
+      final effectiveRatio = 1.0 + (ratio - 1.0) * t * t;
+      gainReduction = (threshold + (abs - threshold) / effectiveRatio) / abs;
+    } else if (abs >= threshold + (knee > 0 ? halfKnee : 0)) {
+      // encima del threshold: comprimir
+      gainReduction = (threshold + (abs - threshold) / ratio) / abs;
+    }
+
+    return x * gainReduction * makeupGain;
+  }
+}
+
+extension on double {
+  int mul32767() => (this * 32767).round().clamp(-32768, 32767);
 }
