@@ -110,8 +110,9 @@ class TranscriptionNotifier extends Notifier<TranscriptionState> {
     }
 
     _ws.sendStart(sampleRate: kSampleRate);
-    _audio.gain = ref.read(settingsProvider).micGain;
-    await _audio.start();
+    final settings = ref.read(settingsProvider);
+    _audio.gain = settings.micGain;
+    await _audio.start(audioSource: settings.audioSource);
 
     _audioSub = _audio.chunks.listen((chunk) {
       print('[Audio] → Enviando chunk: ${chunk.pcmBytes.length} bytes, isFinal=${chunk.isFinal}');

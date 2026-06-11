@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:record/record.dart';
 import '../providers/settings_provider.dart';
 
 class SettingsScreen extends ConsumerWidget {
@@ -56,6 +57,50 @@ class SettingsScreen extends ConsumerWidget {
                   ),
                 ),
               ),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              'Fuente de audio (Android)',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 8),
+            DropdownButtonFormField<AndroidAudioSource>(
+              initialValue: settings.audioSource,
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              ),
+              items: const [
+                DropdownMenuItem(
+                  value: AndroidAudioSource.defaultSource,
+                  child: Text('Por defecto'),
+                ),
+                DropdownMenuItem(
+                  value: AndroidAudioSource.voiceRecognition,
+                  child: Text('Reconocimiento de voz'),
+                ),
+                DropdownMenuItem(
+                  value: AndroidAudioSource.camcorder,
+                  child: Text('Camcorder'),
+                ),
+                DropdownMenuItem(
+                  value: AndroidAudioSource.mic,
+                  child: Text('Micrófono'),
+                ),
+                DropdownMenuItem(
+                  value: AndroidAudioSource.voiceCommunication,
+                  child: Text('Comunicación de voz'),
+                ),
+                DropdownMenuItem(
+                  value: AndroidAudioSource.unprocessed,
+                  child: Text('Sin procesar'),
+                ),
+              ],
+              onChanged: (value) {
+                if (value != null) {
+                  ref.read(settingsProvider.notifier).setAudioSource(value);
+                }
+              },
             ),
           ],
         ),

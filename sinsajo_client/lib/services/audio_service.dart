@@ -31,7 +31,7 @@ class AudioService {
   Stream<AudioChunk> get chunks => _chunkController!.stream;
   Future<bool> get hasPermission async => await _recorder.hasPermission();
 
-  Future<void> start() async {
+  Future<void> start({AndroidAudioSource audioSource = AndroidAudioSource.camcorder}) async {
     await _cleanup();
     _isStopping = false;
 
@@ -50,11 +50,14 @@ class AudioService {
     });
 
     final stream = await _recorder.startStream(
-      const RecordConfig(
+      RecordConfig(
         encoder: AudioEncoder.pcm16bits,
         sampleRate: kSampleRate,
         numChannels: kChannels,
         autoGain: true,
+        androidConfig: AndroidRecordConfig(
+          audioSource: audioSource,
+        ),
       ),
     );
 
