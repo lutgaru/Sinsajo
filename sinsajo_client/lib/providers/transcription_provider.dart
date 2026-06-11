@@ -50,6 +50,8 @@ class TranscriptionNotifier extends Notifier<TranscriptionState> {
     _ws    = WsService(url: kWsUrl);
     _audio = AudioService();
 
+    _ws.connect();
+
     ref.onDispose(() {
       _audioSub?.cancel();
       _wsStatusSub?.cancel();
@@ -98,11 +100,6 @@ class TranscriptionNotifier extends Notifier<TranscriptionState> {
     if (!hasPerm) {
       state = state.copyWith(error: 'Permiso de micrófono denegado');
       return;
-    }
-
-    if (state.wsStatus != WsStatus.connected) {
-      await _ws.connect();
-      await Future.delayed(const Duration(milliseconds: 500));
     }
 
     _ws.sendStart(sampleRate: kSampleRate);
