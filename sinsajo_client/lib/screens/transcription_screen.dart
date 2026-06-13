@@ -79,9 +79,11 @@ class _TranscriptionScreenState extends ConsumerState<TranscriptionScreen>
               child: state.fullText.isEmpty
                   ? Center(
                       child: Text(
-                        state.isRecording
-                            ? 'Escuchando…'
-                            : 'Presiona el micrófono para comenzar',
+                        state.isPaused
+                            ? 'Pausado'
+                            : state.isRecording
+                                ? 'Escuchando…'
+                                : 'Presiona el micrófono para comenzar',
                         style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                               color: Colors.white38,
                             ),
@@ -183,6 +185,16 @@ class _ControlBar extends StatelessWidget {
                 ),
               ),
             ),
+
+            // Pausar / Reanudar (solo visible durante grabación)
+            if (state.isRecording)
+              IconButton.outlined(
+                onPressed: state.isPaused
+                    ? () => notifier.resumeRecording()
+                    : () => notifier.pauseRecording(),
+                icon: Icon(state.isPaused ? Icons.play_arrow : Icons.pause),
+                tooltip: state.isPaused ? 'Reanudar' : 'Pausar',
+              ),
 
             // Limpiar transcripción
             IconButton.outlined(

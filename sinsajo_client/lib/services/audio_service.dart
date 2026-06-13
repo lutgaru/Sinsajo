@@ -76,6 +76,60 @@ class AudioService {
     print('[Audio] Grabacion iniciada (Silero VAD v5)');
   }
 
+  Future<void> pause() async {
+    _isStopping = true;
+    await _recorder.stop();
+    await _stopVad();
+    _isStopping = false;
+    print('[Audio] Grabacion pausada');
+  }
+
+  Future<void> resume({AndroidAudioSource audioSource = AndroidAudioSource.camcorder}) async {
+    _isStopping = false;
+
+    if (_chunkController == null || _chunkController!.isClosed) {
+      _chunkController = StreamController<AudioChunk>.broadcast();
+    }
+
+    _vadHandler = VadHandler.create(isDebug: true);
+
+    _speechEndSub = _vadHandler!.onSpeechEnd.listen((samples) {
+      final pcmBytes = _doubleListToPcm16(samples);
+      _chunkController?.add(AudioChunk(pcmBytes, isFinal: _isStopping));
+    });
+
+    _errorSub = _vadHandler!.onError.listen((err) {
+      print('[VAD] Error: $err');
+      _chunkController?.addError(err);
+    });
+
+    final stream = await _recorder.startStream(
+      RecordConfig(
+        encoder: AudioEncoder.pcm16bits,
+        sampleRate: kSampleRate,
+        numChannels: kChannels,
+        autoGain: true,
+        androidConfig: AndroidRecordConfig(
+          audioSource: audioSource,
+        ),
+      ),
+    );
+
+    await _vadHandler!.startListening(
+      audioStream: stream,
+      model: 'v5',
+      frameSamples: 512,
+      positiveSpeechThreshold: 0.45,
+      negativeSpeechThreshold: 0.35,
+      redemptionFrames: 7,
+      preSpeechPadFrames: 8,
+      minSpeechFrames: 8,
+      endSpeechPadFrames: 3,
+    );
+
+    print('[Audio] Grabacion reanudada');
+  }
+
   Future<void> clean() async {
     _isStopping = true;
     await _stopVad();

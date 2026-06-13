@@ -8,12 +8,14 @@ import 'settings_provider.dart';
 
 class TranscriptionState {
   final bool isRecording;
+  final bool isPaused;
   final WsStatus wsStatus;
   final List<String> segments;
   final String? error;
 
   const TranscriptionState({
     this.isRecording = false,
+    this.isPaused    = false,
     this.wsStatus    = WsStatus.disconnected,
     this.segments    = const [],
     this.error,
@@ -23,6 +25,7 @@ class TranscriptionState {
 
   TranscriptionState copyWith({
     bool?         isRecording,
+    bool?         isPaused,
     WsStatus?     wsStatus,
     List<String>? segments,
     String?       error,
@@ -30,6 +33,7 @@ class TranscriptionState {
   }) =>
       TranscriptionState(
         isRecording: isRecording ?? this.isRecording,
+        isPaused:    isPaused    ?? this.isPaused,
         wsStatus:    wsStatus    ?? this.wsStatus,
         segments:    segments    ?? this.segments,
         error:       clearError ? null : (error ?? this.error),
@@ -100,7 +104,11 @@ class TranscriptionNotifier extends Notifier<TranscriptionState> {
   }
 
   Future<void> startRecording() async {
-    if (state.isRecording) return;
+    if (state.isRecording && !state.isPaused) return;
+    if (state.isPaused) {
+      await resumeRecording();
+      return;
+    }
 
     final hasPerm = await _audio.hasPermission;
     if (!hasPerm) {
@@ -121,6 +129,26 @@ class TranscriptionNotifier extends Notifier<TranscriptionState> {
     state = state.copyWith(isRecording: true, clearError: true);
   }
 
+  Future<void> pauseRecording() async {
+    if (!state.isRecording || state.isPaused) return;
+    await _audioSub?.cancel();
+    _audioSub = null;
+    await _audio.pause();
+    state = state.copyWith(isPaused: true);
+  }
+
+  Future<void> resumeRecording() async {
+    if (!state.isPaused) return;
+    final settings = ref.read(settingsProvider);
+    _audio.gain = settings.micGain;
+    await _audio.resume(audioSource: settings.audioSource);
+    _audioSub = _audio.chunks.listen((chunk) {
+      print('[Audio] → Enviando chunk: ${chunk.pcmBytes.length} bytes, isFinal=${chunk.isFinal}');
+      _ws.sendAudioChunk(chunk.pcmBytes);
+    });
+    state = state.copyWith(isPaused: false);
+  }
+
   Future<void> stopRecording() async {
     if (!state.isRecording) return;
 
@@ -131,7 +159,7 @@ class TranscriptionNotifier extends Notifier<TranscriptionState> {
     _ws.sendStop();
     _ws.sendClean();
 
-    state = state.copyWith(isRecording: false);
+    state = state.copyWith(isRecording: false, isPaused: false);
   }
 
   void clearTranscription() {
