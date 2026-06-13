@@ -4,15 +4,18 @@ import 'package:record/record.dart';
 class SettingsState {
   final double micGain;
   final AndroidAudioSource audioSource;
+  final String ipAddress;
   const SettingsState({
     this.micGain = 1.0,
     this.audioSource = AndroidAudioSource.camcorder,
+    this.ipAddress = '192.168.31.21',
   });
 
-  SettingsState copyWith({double? micGain, AndroidAudioSource? audioSource}) =>
+  SettingsState copyWith({double? micGain, AndroidAudioSource? audioSource, String? ipAddress}) =>
       SettingsState(
         micGain: micGain ?? this.micGain,
         audioSource: audioSource ?? this.audioSource,
+        ipAddress: ipAddress ?? this.ipAddress,
       );
 }
 
@@ -26,6 +29,10 @@ class SettingsNotifier extends Notifier<SettingsState> {
 
   void setAudioSource(AndroidAudioSource source) {
     state = state.copyWith(audioSource: source);
+  }
+
+  void setIpAddress(String ip) {
+    state = state.copyWith(ipAddress: ip);
   }
 }
 

@@ -6,8 +6,6 @@ import '../services/audio_service.dart';
 import '../services/ws_service.dart';
 import 'settings_provider.dart';
 
-const String kWsUrl = 'ws://192.168.31.21:8765';
-
 class TranscriptionState {
   final bool isRecording;
   final WsStatus wsStatus;
@@ -47,7 +45,8 @@ class TranscriptionNotifier extends Notifier<TranscriptionState> {
 
   @override
   TranscriptionState build() {
-    _ws    = WsService(url: kWsUrl);
+    final settings = ref.read(settingsProvider);
+    _ws    = WsService(url: 'ws://${settings.ipAddress}:8765');
     _audio = AudioService();
 
     _ws.connect();

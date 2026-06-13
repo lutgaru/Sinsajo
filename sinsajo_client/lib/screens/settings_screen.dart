@@ -102,6 +102,24 @@ class SettingsScreen extends ConsumerWidget {
                 }
               },
             ),
+            const SizedBox(height: 24),
+            Text(
+              'IP del servidor',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 8),
+            TextFormField(
+              initialValue: settings.ipAddress,
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                hintText: '192.168.31.21',
+              ),
+              keyboardType: TextInputType.url,
+              onChanged: (value) {
+                ref.read(settingsProvider.notifier).setIpAddress(value);
+              },
+            ),
           ],
         ),
       ),
