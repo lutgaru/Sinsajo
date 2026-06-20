@@ -349,11 +349,9 @@ let result = model.transcribe_with(
 - [x] Session restart without crashes
 
 ### In Progress 🔄
-- [ ] Streaming partial results (word-by-word)
 - [ ] Model switching UI
 - [x] Audio recording (WAV export)
 - [ ] Export transcriptions (TXT, SRT)
-- [ ] Timestamps per segment
 
 ### Planned 📅
 - [ ] GPU acceleration (CUDA/DirectML)
@@ -389,12 +387,12 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 **Adrian Sanchez** - Senior Embedded Systems Engineer
 
-- GitHub: [@yourusername](https://github.com/yourusername)
-- Project Link: [https://github.com/yourusername/sinsajo](https://github.com/yourusername/sinsajo)
+- GitHub: [@lutgaru](https://github.com/lutgaru)
+- Project Link: [https://github.com/lutgaru/Sinsajo](https://github.com/lutgaru/Sinsajo)
 
 ## 🙏 Acknowledgments
 
-- [transcribe-rs](https://github.com/yourusername/transcribe-rs) - Rust ONNX transcription library
+- [transcribe-rs](https://github.com/cjpais/transcribe-rs) - Rust ONNX transcription library
 - [Canary](https://huggingface.co/ysdede/canary-180m-flash-onnx) - Fast speech recognition model
 - [Flutter](https://flutter.dev/) - UI framework
 - [Rust](https://www.rust-lang.org/) - Systems programming language
@@ -403,4 +401,3 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 **Status**: ✅ Functional - MVP Complete  
 **Version**: 1.0.0  
-**Last Updated**: June 2026
