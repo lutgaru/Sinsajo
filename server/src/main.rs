@@ -183,6 +183,14 @@ async fn handle_connection(
                                     message: Some("stopped".to_string()),
                                 }).await;
                             }
+                            "discard" => {
+                                audio_buffer.clear();
+                                send_msg(&write, ServerMessage {
+                                    msg_type: "status".to_string(),
+                                    text: None,
+                                    message: Some("discarded".to_string()),
+                                }).await;
+                            }
                             "clean" => {
                                 save_audio(&audio_buffer).await;
                                 audio_buffer.clear();

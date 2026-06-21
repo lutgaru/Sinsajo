@@ -198,7 +198,38 @@ class _ControlBar extends StatelessWidget {
 
             // Limpiar transcripción
             IconButton.outlined(
-              onPressed: state.fullText.isEmpty ? null : notifier.clearTranscription,
+              onPressed: state.fullText.isEmpty
+                  ? null
+                  : () async {
+                      final confirmed = await showDialog<bool>(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          title: const Text('Limpiar transcripción'),
+                          content: Text(
+                            state.isRecording
+                                ? 'Se descartará el audio actual y se limpiará la transcripción.'
+                                : '¿Estás seguro de que quieres limpiar la transcripción?',
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.of(ctx).pop(false),
+                              child: const Text('Cancelar'),
+                            ),
+                            TextButton(
+                              onPressed: () => Navigator.of(ctx).pop(true),
+                              child: const Text('Sí, limpiar'),
+                            ),
+                          ],
+                        ),
+                      );
+                      if (confirmed == true) {
+                        if (state.isRecording) {
+                          await notifier.discardRecording();
+                        } else {
+                          notifier.clearTranscription();
+                        }
+                      }
+                    },
               icon: const Icon(Icons.delete_outline),
               tooltip: 'Limpiar',
             ),

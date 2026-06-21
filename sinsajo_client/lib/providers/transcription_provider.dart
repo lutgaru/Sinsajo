@@ -165,6 +165,21 @@ class TranscriptionNotifier extends Notifier<TranscriptionState> {
   void clearTranscription() {
     state = state.copyWith(segments: []);
   }
+
+  Future<void> discardRecording() async {
+    if (!state.isRecording) {
+      state = state.copyWith(segments: []);
+      return;
+    }
+
+    await _audioSub?.cancel();
+    _audioSub = null;
+
+    await _audio.stop();
+    _ws.sendDiscard();
+
+    state = state.copyWith(isRecording: false, isPaused: false, segments: []);
+  }
 }
 
 final transcriptionProvider =
