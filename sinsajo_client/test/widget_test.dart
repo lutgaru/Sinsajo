@@ -11,10 +11,10 @@ void main() {
     TestWidgetsFlutterBinding.ensureInitialized();
   });
 
-  group('WhisperApp', () {
+  group('SinsajoApp', () {
     testWidgets('renders without crashing', (WidgetTester tester) async {
       await tester.pumpWidget(
-        const ProviderScope(child: WhisperApp()),
+        const ProviderScope(child: SinsajoApp()),
       );
       await tester.pump();
 
@@ -24,7 +24,7 @@ void main() {
 
     testWidgets('shows app title in AppBar', (WidgetTester tester) async {
       await tester.pumpWidget(
-        const ProviderScope(child: WhisperApp()),
+        const ProviderScope(child: SinsajoApp()),
       );
       await tester.pump();
 
@@ -35,7 +35,7 @@ void main() {
   group('TranscriptionScreen', () {
     testWidgets('shows initial prompt when not recording', (WidgetTester tester) async {
       await tester.pumpWidget(
-        const ProviderScope(child: WhisperApp()),
+        const ProviderScope(child: SinsajoApp()),
       );
       await tester.pump();
 
@@ -47,7 +47,7 @@ void main() {
 
     testWidgets('shows microphone button', (WidgetTester tester) async {
       await tester.pumpWidget(
-        const ProviderScope(child: WhisperApp()),
+        const ProviderScope(child: SinsajoApp()),
       );
       await tester.pump();
 
@@ -56,7 +56,7 @@ void main() {
 
     testWidgets('shows copy and clear buttons', (WidgetTester tester) async {
       await tester.pumpWidget(
-        const ProviderScope(child: WhisperApp()),
+        const ProviderScope(child: SinsajoApp()),
       );
       await tester.pump();
 
@@ -66,7 +66,7 @@ void main() {
 
     testWidgets('copy and clear buttons are disabled when no text', (WidgetTester tester) async {
       await tester.pumpWidget(
-        const ProviderScope(child: WhisperApp()),
+        const ProviderScope(child: SinsajoApp()),
       );
       await tester.pump();
 

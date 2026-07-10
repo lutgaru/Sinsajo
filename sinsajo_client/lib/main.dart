@@ -3,11 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'screens/transcription_screen.dart';
 
 void main() {
-  runApp(const ProviderScope(child: WhisperApp()));
+  runApp(const ProviderScope(child: SinsajoApp()));
 }
 
-class WhisperApp extends StatelessWidget {
-  const WhisperApp({super.key});
+class SinsajoApp extends StatelessWidget {
+  const SinsajoApp({super.key});
 
   @override
   Widget build(BuildContext context) {
