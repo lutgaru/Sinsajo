@@ -1,4 +1,4 @@
-# Sinsajó - Real-Time Local Voice Transcription
+# Sinsajo - Real-Time Local Voice Transcription
 
 A self-hosted real-time voice transcription system that converts speech to text using local AI models. Built with **Flutter** (client) and **Rust** (server), featuring Voice Activity Detection (VAD) and the **Canary 180M Flash** model for fast, accurate transcription.
 
