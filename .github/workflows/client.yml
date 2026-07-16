@@ -1,0 +1,89 @@
+name: Client CI/CD
+
+on:
+  push:
+    paths:
+      - 'sinsajo_client/**'
+      - '.github/workflows/client.yml'
+  pull_request:
+    paths:
+      - 'sinsajo_client/**'
+      - '.github/workflows/client.yml'
+  release:
+    types: [published]
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: sinsajo_client
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Analyze
+        run: flutter analyze
+
+      - name: Test
+        run: flutter test
+
+  release-android:
+    if: github.event_name == 'release'
+    needs: ci
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: sinsajo_client
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Build APK
+        run: flutter build apk --release
+
+      - name: Upload APK to release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload "${{ github.event.release.tag_name }}" \
+            "build/app/outputs/flutter-apk/app-release.apk" \
+            --clobber
+
+  release-web:
+    if: github.event_name == 'release'
+    needs: ci
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: sinsajo_client
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Build web
+        run: flutter build web --release
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./sinsajo_client/build/web
