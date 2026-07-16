@@ -53,7 +53,7 @@ class _TranscriptionScreenState extends ConsumerState<TranscriptionScreen>
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Whisper Local'),
+        title: const Text('Sinsajo client'),
         actions: [
           IconButton(
             icon: const Icon(Icons.settings),
