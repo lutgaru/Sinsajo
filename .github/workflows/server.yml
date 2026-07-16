@@ -14,9 +14,11 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  TAG_PREFIX: server/
 
 jobs:
   ci:
+    if: github.event_name != 'release' || startsWith(github.event.release.tag_name || '', env.TAG_PREFIX)
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -37,7 +39,7 @@ jobs:
         run: cargo test
 
   release-linux:
-    if: github.event_name == 'release'
+    if: github.event_name == 'release' && startsWith(github.event.release.tag_name || '', env.TAG_PREFIX)
     needs: ci
     runs-on: ubuntu-latest
     defaults:
@@ -64,7 +66,7 @@ jobs:
             --clobber
 
   release-windows:
-    if: github.event_name == 'release'
+    if: github.event_name == 'release' && startsWith(github.event.release.tag_name || '', env.TAG_PREFIX)
     needs: ci
     runs-on: windows-latest
     defaults:
