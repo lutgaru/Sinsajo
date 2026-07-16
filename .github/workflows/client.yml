@@ -12,12 +12,9 @@ on:
   release:
     types: [published]
 
-env:
-  TAG_PREFIX: client/
-
 jobs:
   ci:
-    if: github.event_name != 'release' || startsWith(github.event.release.tag_name || '', env.TAG_PREFIX)
+    if: github.event_name != 'release' || startsWith(github.event.release.tag_name || '', 'client/')
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -39,7 +36,7 @@ jobs:
         run: flutter test
 
   release-android:
-    if: github.event_name == 'release' && startsWith(github.event.release.tag_name || '', env.TAG_PREFIX)
+    if: github.event_name == 'release' && startsWith(github.event.release.tag_name || '', 'client/')
     needs: ci
     runs-on: ubuntu-latest
     defaults:
@@ -67,7 +64,7 @@ jobs:
             --clobber
 
   release-web:
-    if: github.event_name == 'release' && startsWith(github.event.release.tag_name || '', env.TAG_PREFIX)
+    if: github.event_name == 'release' && startsWith(github.event.release.tag_name || '', 'client/')
     needs: ci
     runs-on: ubuntu-latest
     defaults:
