@@ -1,6 +1,7 @@
 // lib/providers/transcription_provider.dart
 
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/audio_service.dart';
 import '../services/ws_service.dart';
@@ -68,7 +69,7 @@ class TranscriptionNotifier extends Notifier<TranscriptionState> {
     });
 
     _wsMessageSub = _ws.messageStream.listen((msg) {
-      print('[WS] ← Recibido: type=${msg.type}, content=${msg.content}');
+      debugPrint('[WS] ← Received: type=${msg.type}, content=${msg.content}');
       switch (msg.type) {
         case 'transcription':
         case 'partial':
@@ -98,7 +99,7 @@ class TranscriptionNotifier extends Notifier<TranscriptionState> {
 
   Future<void> reconnectIfNeeded() async {
     if (_ws.status != WsStatus.connected) {
-      print('[WS] 🔄 Reconectando por cambio de lifecycle');
+      debugPrint('[WS] 🔄 Reconnecting due to lifecycle change');
       await _ws.connect();
     }
   }
@@ -112,7 +113,7 @@ class TranscriptionNotifier extends Notifier<TranscriptionState> {
 
     final hasPerm = await _audio.hasPermission;
     if (!hasPerm) {
-      state = state.copyWith(error: 'Permiso de micrófono denegado');
+      state = state.copyWith(error: 'Microphone permission denied');
       return;
     }
 
@@ -122,7 +123,7 @@ class TranscriptionNotifier extends Notifier<TranscriptionState> {
     await _audio.start(audioSource: settings.audioSource);
 
     _audioSub = _audio.chunks.listen((chunk) {
-      print('[Audio] → Enviando chunk: ${chunk.pcmBytes.length} bytes, isFinal=${chunk.isFinal}');
+      debugPrint('[Audio] → Enviando chunk: ${chunk.pcmBytes.length} bytes, isFinal=${chunk.isFinal}');
       _ws.sendAudioChunk(chunk.pcmBytes);
     });
 
@@ -143,7 +144,7 @@ class TranscriptionNotifier extends Notifier<TranscriptionState> {
     _audio.gain = settings.micGain;
     await _audio.resume(audioSource: settings.audioSource);
     _audioSub = _audio.chunks.listen((chunk) {
-      print('[Audio] → Enviando chunk: ${chunk.pcmBytes.length} bytes, isFinal=${chunk.isFinal}');
+      debugPrint('[Audio] → Enviando chunk: ${chunk.pcmBytes.length} bytes, isFinal=${chunk.isFinal}');
       _ws.sendAudioChunk(chunk.pcmBytes);
     });
     state = state.copyWith(isPaused: false);

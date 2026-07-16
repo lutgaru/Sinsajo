@@ -62,7 +62,7 @@ class _TranscriptionScreenState extends ConsumerState<TranscriptionScreen>
                 MaterialPageRoute(builder: (_) => const SettingsScreen()),
               );
             },
-            tooltip: 'Ajustes',
+            tooltip: 'Settings',
           ),
           Padding(
             padding: const EdgeInsets.only(right: 16),
@@ -72,7 +72,7 @@ class _TranscriptionScreenState extends ConsumerState<TranscriptionScreen>
       ),
       body: Column(
         children: [
-          // ── Texto transcrito ─────────────────────────
+          // ── Transcribed text ─────────────────────────
           Expanded(
             child: Padding(
               padding: const EdgeInsets.all(16),
@@ -80,10 +80,10 @@ class _TranscriptionScreenState extends ConsumerState<TranscriptionScreen>
                   ? Center(
                       child: Text(
                         state.isPaused
-                            ? 'Pausado'
+                            ? 'Paused'
                             : state.isRecording
-                                ? 'Escuchando…'
-                                : 'Presiona el micrófono para comenzar',
+                                ? 'Listening…'
+                                : 'Press the microphone to start',
                         style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                               color: Colors.white38,
                             ),
@@ -112,7 +112,7 @@ class _TranscriptionScreenState extends ConsumerState<TranscriptionScreen>
               ),
             ),
 
-          // ── Barra de controles ────────────────────────
+          // ── Control bar ────────────────────────
           _ControlBar(state: state, notifier: notifier),
         ],
       ),
@@ -120,7 +120,7 @@ class _TranscriptionScreenState extends ConsumerState<TranscriptionScreen>
   }
 }
 
-// ── Barra inferior ────────────────────────────────
+// ── Bottom bar ────────────────────────────────
 
 class _ControlBar extends StatelessWidget {
   const _ControlBar({required this.state, required this.notifier});
@@ -136,21 +136,21 @@ class _ControlBar extends StatelessWidget {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
-            // Copiar texto
+            // Copy text
             IconButton.outlined(
               onPressed: state.fullText.isEmpty
                   ? null
                   : () {
                       Clipboard.setData(ClipboardData(text: state.fullText));
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Copiado al portapapeles')),
+                        const SnackBar(content: Text('Copied to clipboard')),
                       );
                     },
               icon: const Icon(Icons.copy),
-              tooltip: 'Copiar',
+              tooltip: 'Copy',
             ),
 
-            // Botón principal de micrófono
+            // Main microphone button
             GestureDetector(
               onTap: () async {
                 if (state.isRecording) {
@@ -171,7 +171,7 @@ class _ControlBar extends StatelessWidget {
                   boxShadow: state.isRecording
                       ? [
                           BoxShadow(
-                            color: Colors.red.withOpacity(0.5),
+                            color: Colors.red.withValues(alpha: 0.5),
                             blurRadius: 20,
                             spreadRadius: 4,
                           )
@@ -186,17 +186,17 @@ class _ControlBar extends StatelessWidget {
               ),
             ),
 
-            // Pausar / Reanudar (solo visible durante grabación)
+            // Pause / Resume (only visible during recording)
             if (state.isRecording)
               IconButton.outlined(
                 onPressed: state.isPaused
                     ? () => notifier.resumeRecording()
                     : () => notifier.pauseRecording(),
                 icon: Icon(state.isPaused ? Icons.play_arrow : Icons.pause),
-                tooltip: state.isPaused ? 'Reanudar' : 'Pausar',
+                tooltip: state.isPaused ? 'Resume' : 'Pause',
               ),
 
-            // Limpiar transcripción
+            // Clear transcription
             IconButton.outlined(
               onPressed: state.fullText.isEmpty
                   ? null
@@ -204,20 +204,20 @@ class _ControlBar extends StatelessWidget {
                       final confirmed = await showDialog<bool>(
                         context: context,
                         builder: (ctx) => AlertDialog(
-                          title: const Text('Limpiar transcripción'),
+                          title: const Text('Clear transcription'),
                           content: Text(
                             state.isRecording
-                                ? 'Se descartará el audio actual y se limpiará la transcripción.'
-                                : '¿Estás seguro de que quieres limpiar la transcripción?',
+                                ? 'The current audio will be discarded and the transcription cleared.'
+                                : 'Are you sure you want to clear the transcription?',
                           ),
                           actions: [
                             TextButton(
                               onPressed: () => Navigator.of(ctx).pop(false),
-                              child: const Text('Cancelar'),
+                              child: const Text('Cancel'),
                             ),
                             TextButton(
                               onPressed: () => Navigator.of(ctx).pop(true),
-                              child: const Text('Sí, limpiar'),
+                              child: const Text('Yes, clear'),
                             ),
                           ],
                         ),
@@ -231,7 +231,7 @@ class _ControlBar extends StatelessWidget {
                       }
                     },
               icon: const Icon(Icons.delete_outline),
-              tooltip: 'Limpiar',
+              tooltip: 'Clear',
             ),
           ],
         ),
@@ -240,7 +240,7 @@ class _ControlBar extends StatelessWidget {
   }
 }
 
-// ── Indicador de estado WS ────────────────────────
+// ── WS status indicator ────────────────────────
 
 class _WsStatusDot extends StatelessWidget {
   const _WsStatusDot({required this.status});
@@ -250,10 +250,10 @@ class _WsStatusDot extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final (color, label) = switch (status) {
-      WsStatus.connected    => (Colors.greenAccent, 'Conectado'),
-      WsStatus.connecting   => (Colors.orange, 'Conectando'),
+      WsStatus.connected    => (Colors.greenAccent, 'Connected'),
+      WsStatus.connecting   => (Colors.orange, 'Connecting'),
       WsStatus.error        => (Colors.red, 'Error'),
-      WsStatus.disconnected => (Colors.grey, 'Desconectado'),
+      WsStatus.disconnected => (Colors.grey, 'Disconnected'),
     };
 
     return Tooltip(

@@ -12,7 +12,7 @@ class SettingsScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Ajustes'),
+        title: const Text('Settings'),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16),
@@ -20,7 +20,7 @@ class SettingsScreen extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Ganancia del micrófono',
+              'Microphone gain',
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 8),
@@ -60,7 +60,7 @@ class SettingsScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 24),
             Text(
-              'Fuente de audio (Android)',
+              'Audio source (Android)',
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 8),
@@ -73,11 +73,11 @@ class SettingsScreen extends ConsumerWidget {
               items: const [
                 DropdownMenuItem(
                   value: AndroidAudioSource.defaultSource,
-                  child: Text('Por defecto'),
+                  child: Text('Default'),
                 ),
                 DropdownMenuItem(
                   value: AndroidAudioSource.voiceRecognition,
-                  child: Text('Reconocimiento de voz'),
+                  child: Text('Voice recognition'),
                 ),
                 DropdownMenuItem(
                   value: AndroidAudioSource.camcorder,
@@ -85,15 +85,15 @@ class SettingsScreen extends ConsumerWidget {
                 ),
                 DropdownMenuItem(
                   value: AndroidAudioSource.mic,
-                  child: Text('Micrófono'),
+                  child: Text('Microphone'),
                 ),
                 DropdownMenuItem(
                   value: AndroidAudioSource.voiceCommunication,
-                  child: Text('Comunicación de voz'),
+                  child: Text('Voice communication'),
                 ),
                 DropdownMenuItem(
                   value: AndroidAudioSource.unprocessed,
-                  child: Text('Sin procesar'),
+                  child: Text('Unprocessed'),
                 ),
               ],
               onChanged: (value) {
@@ -104,7 +104,7 @@ class SettingsScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 24),
             Text(
-              'IP del servidor',
+              'Server IP',
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 8),

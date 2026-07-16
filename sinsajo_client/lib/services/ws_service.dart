@@ -2,7 +2,7 @@
 
 import 'dart:async';
 import 'dart:convert';
-import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 enum WsStatus { disconnected, connecting, connected, error }
@@ -55,18 +55,18 @@ class WsService {
 
       _setStatus(WsStatus.connected);
       _reconnectAttempts = 0;
-      print('[WS] ✅ Conectado a $url');
+      debugPrint('[WS] ✅ Connected to $url');
 
       _sub = _channel!.stream.listen(
         _onMessage,
         onError: (e) {
-          print('[WS] ❌ Error: $e');
+          debugPrint('[WS] ❌ Error: $e');
           _setStatus(WsStatus.error);
           _messageController.add(WsMessage('error', e.toString()));
           _scheduleReconnect();
         },
         onDone: () {
-          print('[WS] 🔌 Desconectado');
+          debugPrint('[WS] 🔌 Disconnected');
           _setStatus(WsStatus.disconnected);
           if (!_intentionalDisconnect && !_isDisposed) {
             _scheduleReconnect();
@@ -74,7 +74,7 @@ class WsService {
         },
       );
     } catch (e) {
-      print('[WS] ❌ Connection failed: $e');
+      debugPrint('[WS] ❌ Connection failed: $e');
       _setStatus(WsStatus.error);
       _messageController.add(WsMessage('error', 'Connection failed: $e'));
       if (!_intentionalDisconnect && !_isDisposed) {
@@ -86,13 +86,13 @@ class WsService {
   void _scheduleReconnect() {
     if (_isDisposed || _intentionalDisconnect) return;
     if (_reconnectAttempts >= _maxReconnectAttempts) {
-      print('[WS] ⚠ Máximo de reintentos alcanzado');
+      debugPrint('[WS] ⚠ Max reconnection attempts reached');
       return;
     }
     _reconnectTimer?.cancel();
     _reconnectAttempts++;
-    print('[WS] 🔄 Reintentando en ${_reconnectDelay.inSeconds}s '
-        '(intento $_reconnectAttempts/$_maxReconnectAttempts)');
+    debugPrint('[WS] 🔄 Retrying in ${_reconnectDelay.inSeconds}s '
+        '(attempt $_reconnectAttempts/$_maxReconnectAttempts)');
     _reconnectTimer = Timer(_reconnectDelay, () {
       if (!_isDisposed && !_intentionalDisconnect) {
         connect();
@@ -132,7 +132,7 @@ class WsService {
 
   void sendAudioChunk(Uint8List pcmBytes) {
     if (_status != WsStatus.connected) {
-      print('[WS] ⚠ Audio no enviado: no conectado');
+      debugPrint('[WS] ⚠ Audio not sent: not connected');
       return;
     }
     _channel?.sink.add(pcmBytes);
@@ -140,16 +140,16 @@ class WsService {
 
   void _sendJson(Map<String, dynamic> msg) {
     if (_status != WsStatus.connected || _isDisposed) {
-      print('[WS] ⚠ JSON no enviado: no conectado');
+      debugPrint('[WS] ⚠ JSON not sent: not connected');
       return;
     }
-    print('[WS] → Enviando: $msg');
+    debugPrint('[WS] → Sending: $msg');
     _channel?.sink.add(jsonEncode(msg));
   }
 
   void _onMessage(dynamic raw) {
     if (raw is! String || _isDisposed) {
-      print('[WS] ← Mensaje no-string recibido');
+      debugPrint('[WS] ← Non-string message received');
       return;
     }
 
@@ -159,7 +159,7 @@ class WsService {
       final text = (map['text'] ?? map['message'] ?? '') as String;
       _messageController.add(WsMessage(type, text));
     } catch (e) {
-      print('[WS] ⚠ Error parseando mensaje: $e');
+      debugPrint('[WS] ⚠ Error parsing message: $e');
     }
   }
 

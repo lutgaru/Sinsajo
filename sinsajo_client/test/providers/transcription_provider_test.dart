@@ -73,13 +73,13 @@ void main() {
       state = state.copyWith(wsStatus: WsStatus.connecting);
       state = state.copyWith(wsStatus: WsStatus.connected);
       state = state.copyWith(isRecording: true);
-      state = state.copyWith(segments: ['Hola']);
-      state = state.copyWith(segments: [...state.segments, 'mundo']);
+      state = state.copyWith(segments: ['Hello']);
+      state = state.copyWith(segments: [...state.segments, 'world']);
       state = state.copyWith(isRecording: false);
 
       expect(state.wsStatus, WsStatus.connected);
       expect(state.isRecording, false);
-      expect(state.fullText, 'Hola mundo');
+      expect(state.fullText, 'Hello world');
       expect(state.error, isNull);
     });
   });

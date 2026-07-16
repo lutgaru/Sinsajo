@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
 import 'package:record/record.dart';
 import 'package:vad/vad.dart';
 
@@ -23,10 +24,10 @@ class AudioService {
   bool _isStopping = false;
 
   double gain = 1.0;
-  double threshold = 0.15; // a partir de qué nivel comprime
-  double ratio = 4.0; // cuánto comprime los picos (4:1)
-  double makeupGain = 2; // ganancia aplicada después de comprimir
-  double knee = 0.05; // transición suave en el threshold
+  double threshold = 0.15; // level at which compression kicks in
+  double ratio = 4.0; // how much it compresses peaks (4:1)
+  double makeupGain = 2; // gain applied after compression
+  double knee = 0.05; // smooth transition at the threshold
 
   Stream<AudioChunk> get chunks => _chunkController!.stream;
   Future<bool> get hasPermission async => await _recorder.hasPermission();
@@ -45,7 +46,7 @@ class AudioService {
     });
 
     _errorSub = _vadHandler!.onError.listen((err) {
-      print('[VAD] Error: $err');
+      debugPrint('[VAD] Error: $err');
       _chunkController?.addError(err);
     });
 
@@ -73,7 +74,7 @@ class AudioService {
       endSpeechPadFrames: 3,
     );
 
-    print('[Audio] Grabacion iniciada (Silero VAD v5)');
+    debugPrint('[Audio] Recording started (Silero VAD v5)');
   }
 
   Future<void> pause() async {
@@ -81,7 +82,7 @@ class AudioService {
     await _recorder.stop();
     await _stopVad();
     _isStopping = false;
-    print('[Audio] Grabacion pausada');
+    debugPrint('[Audio] Recording paused');
   }
 
   Future<void> resume({AndroidAudioSource audioSource = AndroidAudioSource.camcorder}) async {
@@ -99,7 +100,7 @@ class AudioService {
     });
 
     _errorSub = _vadHandler!.onError.listen((err) {
-      print('[VAD] Error: $err');
+      debugPrint('[VAD] Error: $err');
       _chunkController?.addError(err);
     });
 
@@ -127,14 +128,14 @@ class AudioService {
       endSpeechPadFrames: 3,
     );
 
-    print('[Audio] Grabacion reanudada');
+    debugPrint('[Audio] Recording resumed');
   }
 
   Future<void> clean() async {
     _isStopping = true;
     await _stopVad();
     _isStopping = false;
-    print('[Audio] Estado limpiado');
+    debugPrint('[Audio] State cleaned');
   }
 
   Future<void> stop() async {
@@ -142,7 +143,7 @@ class AudioService {
     await _recorder.stop();
     await _stopVad();
     await _chunkController?.close();
-    print('[Audio] Grabacion detenida');
+    debugPrint('[Audio] Recording stopped');
   }
 
   Future<void> _stopVad() async {
@@ -184,12 +185,12 @@ class AudioService {
     final halfKnee = knee / 2;
 
     if (knee > 0 && abs > threshold - halfKnee && abs < threshold + halfKnee) {
-      // zona de soft knee: transición suave
+      // soft knee zone: smooth transition
       final t = (abs - (threshold - halfKnee)) / knee;
       final effectiveRatio = 1.0 + (ratio - 1.0) * t * t;
       gainReduction = (threshold + (abs - threshold) / effectiveRatio) / abs;
     } else if (abs >= threshold + (knee > 0 ? halfKnee : 0)) {
-      // encima del threshold: comprimir
+      // above threshold: compress
       gainReduction = (threshold + (abs - threshold) / ratio) / abs;
     }
 

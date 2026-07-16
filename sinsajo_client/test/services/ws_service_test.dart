@@ -19,9 +19,9 @@ void main() {
     test('dispose can be called safely', () {
       final service = WsService(url: 'ws://localhost:8765');
 
-      // No debe lanzar excepción
+      // Should not throw an exception
       service.dispose();
-      service.dispose(); // Llamar dos veces tampoco debe fallar
+      service.dispose(); // Calling twice should not fail either
     });
 
     test('messageStream can be listened to', () async {

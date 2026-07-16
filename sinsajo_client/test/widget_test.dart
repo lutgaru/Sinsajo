@@ -28,7 +28,7 @@ void main() {
       );
       await tester.pump();
 
-      expect(find.text('Whisper Local'), findsOneWidget);
+      expect(find.text('Sinsajo client'), findsOneWidget);
     });
   });
 
@@ -40,7 +40,7 @@ void main() {
       await tester.pump();
 
       expect(
-        find.text('Presiona el micrófono para comenzar'),
+        find.text('Press the microphone to start'),
         findsOneWidget,
       );
     });
@@ -70,7 +70,7 @@ void main() {
       );
       await tester.pump();
 
-      // Buscar los botones de copiar y limpiar por ícono
+      // Find the copy and clear buttons by icon
       final copyIcon  = find.byIcon(Icons.copy);
       final clearIcon = find.byIcon(Icons.delete_outline);
       
