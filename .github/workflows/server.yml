@@ -40,6 +40,8 @@ jobs:
   release-linux:
     if: github.event_name == 'release' && startsWith(github.event.release.tag_name || '', 'server/')
     needs: ci
+    permissions:
+      contents: write
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -67,6 +69,8 @@ jobs:
   release-windows:
     if: github.event_name == 'release' && startsWith(github.event.release.tag_name || '', 'server/')
     needs: ci
+    permissions:
+      contents: write
     runs-on: windows-latest
     defaults:
       run:
