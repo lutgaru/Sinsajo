@@ -47,5 +47,6 @@ app.*.map.json
 /linux
 /macos
 /windows
-/android
+/android/.gradle/
+/android/local.properties
 /ios
