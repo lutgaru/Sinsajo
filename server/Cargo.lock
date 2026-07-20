@@ -992,6 +992,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "sinsajo-server"
+version = "0.1.0"
+dependencies = [
+ "futures-util",
+ "hound",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tokio-tungstenite",
+ "transcribe-rs",
+]
+
+[[package]]
 name = "slab"
 version = "0.4.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1354,19 +1367,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f31141ce3fc3e300ae89b78c0dd67f9708061d1d2eda54b8209346fd6be9a92c"
 dependencies = [
  "rustls-pki-types",
-]
-
-[[package]]
-name = "whisper-server"
-version = "0.1.0"
-dependencies = [
- "futures-util",
- "hound",
- "serde",
- "serde_json",
- "tokio",
- "tokio-tungstenite",
- "transcribe-rs",
 ]
 
 [[package]]
