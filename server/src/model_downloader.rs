@@ -19,7 +19,6 @@ struct ModelInfo {
 #[derive(Debug, Deserialize)]
 struct Sibling {
     rfilename: String,
-    size: Option<u64>,
 }
 
 pub fn model_exists() -> bool {
@@ -68,27 +67,45 @@ async fn download_model() -> Result<(), Box<dyn std::error::Error>> {
     fs::create_dir_all(target_dir)?;
 
     // Filter out .git files/dirs
-    let files: Vec<&Sibling> = info.siblings.iter()
+    let rfilenames: Vec<&String> = info.siblings.iter()
         .filter(|s| !s.rfilename.starts_with(".git"))
+        .map(|s| &s.rfilename)
         .collect();
 
-    let total_size: u64 = files.iter().filter_map(|f| f.size).sum();
+    let total_count = rfilenames.len();
 
-    let pb = ProgressBar::new(total_size);
-    pb.set_style(ProgressStyle::default_bar()
-        .template("[{elapsed_precise}] [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({eta})")
-        .unwrap()
-        .progress_chars("=>-"));
-
-    for file in &files {
-        let file_url = format!("{}/{}", HF_RESOLVE, file.rfilename);
-        let file_path = target_dir.join(&file.rfilename);
+    for (i, name) in rfilenames.iter().enumerate() {
+        let file_url = format!("{}/{}", HF_RESOLVE, name);
+        let file_path = target_dir.join(name);
 
         if let Some(parent) = file_path.parent() {
             fs::create_dir_all(parent)?;
         }
 
+        println!("[{}/{}] Downloading {}...", i + 1, total_count, name);
+
         let response = client.get(&file_url).send().await?;
+        let file_size = response.content_length().unwrap_or(0);
+
+        let pb = if file_size > 0 {
+            let pb = ProgressBar::new(file_size);
+            pb.set_style(
+                ProgressStyle::default_bar()
+                    .template("[{elapsed_precise}] [{bar:30.cyan/blue}] {bytes}/{total_bytes} ({eta})")
+                    .unwrap()
+                    .progress_chars("=>-"),
+            );
+            pb
+        } else {
+            let pb = ProgressBar::new_spinner();
+            pb.set_style(
+                ProgressStyle::default_spinner()
+                    .template("{spinner} {bytes} downloaded")
+                    .unwrap(),
+            );
+            pb
+        };
+
         let mut file_content = Vec::new();
         let mut stream = response.bytes_stream();
 
@@ -98,9 +115,11 @@ async fn download_model() -> Result<(), Box<dyn std::error::Error>> {
             pb.inc(chunk.len() as u64);
         }
 
+        pb.finish_and_clear();
+
         fs::write(&file_path, &file_content)?;
     }
 
-    pb.finish_with_message("✅ Download complete");
+    println!("✅ Download complete");
     Ok(())
 }
