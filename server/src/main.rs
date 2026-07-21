@@ -1,3 +1,4 @@
+use clap::Parser;
 use futures_util::{SinkExt, StreamExt};
 use hound;
 use serde::{Deserialize, Serialize};
@@ -15,6 +16,15 @@ use transcribe_rs::onnx::parakeet::ParakeetModel;
 use transcribe_rs::onnx::Quantization;
 use transcribe_rs::SpeechModel;
 use transcribe_rs::TranscribeOptions;
+
+mod model_downloader;
+
+#[derive(Parser)]
+#[command(name = "sinsajo-server", version, about = "Speech-to-text WebSocket server")]
+struct Args {
+    #[arg(long)]
+    autodownload_models: bool,
+}
 
 #[derive(Debug, Deserialize)]
 struct ClientMessage {
@@ -41,7 +51,7 @@ enum ModelKind {
 
 const MODEL_KIND: ModelKind = ModelKind::ParakeetTDT;
 
-// Alias para el sink compartido entre el loop principal y las tareas de transcripción
+// Shared sink alias for the main loop and transcription tasks
 type WsSink = Arc<
     Mutex<futures_util::stream::SplitSink<tokio_tungstenite::WebSocketStream<TcpStream>, Message>>,
 >;
@@ -73,7 +83,7 @@ async fn save_audio(audio_buffer: &[f32]) {
             let _ = writer.write_sample((s * 32768.0) as i16);
         }
         let _ = writer.finalize();
-        println!("💾 Audio guardado: {}", filename);
+        println!("💾 Audio saved: {}", filename);
     }
 }
 
@@ -96,7 +106,7 @@ async fn transcribe_and_send(
         Ok(result) => {
             let text = result.text.trim().to_string();
             if !text.is_empty() {
-                println!("✅ Transcripción: '{}'", text);
+                println!("✅ Transcription: '{}'", text);
                 send_msg(
                     &write,
                     ServerMessage {
@@ -107,11 +117,11 @@ async fn transcribe_and_send(
                 )
                 .await;
             } else {
-                println!("⚠ Transcripción vacía");
+                println!("⚠ Empty transcription");
             }
         }
         Err(e) => {
-            eprintln!("❌ Error transcribiendo: {}", e);
+            eprintln!("❌ Error transcribing: {}", e);
             send_msg(
                 &write,
                 ServerMessage {
@@ -132,18 +142,18 @@ async fn handle_connection(
     sem: Arc<Semaphore>,
     shutdown: Arc<Notify>,
 ) {
-    println!("🔗 Cliente conectado: {}", addr);
+    println!("🔗 Client connected: {}", addr);
 
     let ws_stream = match accept_async(stream).await {
         Ok(ws) => ws,
         Err(e) => {
-            eprintln!("Error aceptando WebSocket: {}", e);
+            eprintln!("Error accepting WebSocket: {}", e);
             return;
         }
     };
 
     let (write_half, mut read) = ws_stream.split();
-    // Arc<Mutex<sink>> compartido entre el loop y las tareas de transcripción
+    // Arc<Mutex<sink>> shared between the main loop and transcription tasks
     let write: WsSink = Arc::new(Mutex::new(write_half));
 
     let _ = fs::create_dir_all("records");
@@ -153,7 +163,7 @@ async fn handle_connection(
         tokio::select! {
             msg = read.next() => {
                 match msg {
-                    // ── Mensajes de control (JSON) ────────────────────────
+                    // ── Control messages (JSON) ───────────────────────────
                     Some(Ok(Message::Text(text))) => {
                         let client_msg: ClientMessage = match serde_json::from_str(&text) {
                             Ok(m) => m,
@@ -161,7 +171,7 @@ async fn handle_connection(
                                 send_msg(&write, ServerMessage {
                                     msg_type: "error".to_string(),
                                     text: None,
-                                    message: Some(format!("JSON inválido: {}", e)),
+                                    message: Some(format!("Invalid JSON: {}", e)),
                                 }).await;
                                 continue;
                             }
@@ -204,30 +214,30 @@ async fn handle_connection(
                         }
                     }
 
-                    // ── Audio binario (PCM int16 LE) ──────────────────────
+                    // ── Binary audio (PCM int16 LE) ───────────────────────
                     Some(Ok(Message::Binary(data))) => {
-                        // Decodificar PCM i16 → f32
+                        // Decode PCM i16 → f32
                         let samples: Vec<f32> = data
                             .chunks_exact(2)
                             .map(|b| i16::from_le_bytes([b[0], b[1]]) as f32 / 32768.0)
                             .collect();
 
                         let duration_ms = samples.len() as f32 / 16.0; // /16000*1000
-                        println!("📥 Chunk recibido: {:.0}ms ({} samples)", duration_ms, samples.len());
+                        println!("📥 Chunk received: {:.0}ms ({} samples)", duration_ms, samples.len());
 
                         if duration_ms < 300.0 {
-                            println!("⚠ Chunk muy corto ({:.0}ms), descartado", duration_ms);
+                            println!("⚠ Chunk too short ({:.0}ms), discarded", duration_ms);
                             continue;
                         }
 
-                        // Acumular para el WAV de debug
+                        // Accumulate for debug WAV
                         audio_buffer.extend_from_slice(&samples);
 
-                        // ── Transcripción en tarea separada ───────────────
-                        // El loop de lectura NO se bloquea. Mientras el modelo
-                        // procesa el chunk, seguimos recibiendo audio.
-                        // El Semaphore(1) garantiza que solo una inferencia
-                        // corre a la vez (evita OOM y resultados desordenados).
+                        // ── Transcription in a separate task ──────────────
+                        // The read loop does NOT block. While the model
+                        // processes the chunk, we keep receiving audio.
+                        // Semaphore(1) ensures only one inference runs
+                        // at a time (avoids OOM and out-of-order results).
                         let model_clone = Arc::clone(&model);
                         let sem_clone   = Arc::clone(&sem);
                         let write_clone = Arc::clone(&write);
@@ -239,14 +249,14 @@ async fn handle_connection(
                         ));
                     }
 
-                    // ── Cierre limpio ─────────────────────────────────────
+                    // ── Clean close ───────────────────────────────────────
                     Some(Ok(Message::Close(_))) | None => {
-                        println!("👋 Cliente desconectado: {}", addr);
+                        println!("👋 Client disconnected: {}", addr);
                         save_audio(&audio_buffer).await;
                         break;
                     }
                     Some(Err(e)) => {
-                        eprintln!("Error WebSocket ({}): {}", addr, e);
+                        eprintln!("WebSocket error ({}): {}", addr, e);
                         save_audio(&audio_buffer).await;
                         break;
                     }
@@ -256,7 +266,7 @@ async fn handle_connection(
 
             // ── Shutdown global (Ctrl+C) ──────────────────────────────────
             _ = shutdown.notified() => {
-                println!("🛑 Shutdown: cerrando {}", addr);
+                println!("🛑 Shutdown: closing {}", addr);
                 save_audio(&audio_buffer).await;
                 let mut w = write.lock().await;
                 let _ = w.close().await;
@@ -265,44 +275,48 @@ async fn handle_connection(
         }
     }
 
-    println!("👋 Conexión con {} finalizada", addr);
+    println!("👋 Connection with {} closed", addr);
 }
 
 #[tokio::main]
 async fn main() {
+    let args = Args::parse();
+
+    model_downloader::ensure_model(args.autodownload_models).await;
+
     let model: Arc<Mutex<Box<dyn SpeechModel + Send>>> = match MODEL_KIND {
         ModelKind::Canary180M => {
-            println!("🚀 Cargando modelo Canary 180M Flash...");
+            println!("🚀 Loading Canary 180M Flash model...");
             match CanaryModel::load(
                 &PathBuf::from("models/canary-180m-flash-onnx"),
                 &Quantization::Int8,
             ) {
                 Ok(m) => Arc::new(Mutex::new(Box::new(m) as Box<dyn SpeechModel + Send>)),
                 Err(e) => {
-                    eprintln!("❌ Error cargando Canary: {}", e);
+                    eprintln!("❌ Error loading Canary: {}", e);
                     return;
                 }
             }
         }
         ModelKind::ParakeetTDT => {
-            println!("🚀 Cargando modelo Parakeet TDT 0.6b v3...");
+            println!("🚀 Loading Parakeet TDT 0.6b v3 model...");
             match ParakeetModel::load(
                 &PathBuf::from("models/parakeet-tdt-0.6b-v3-onnx"),
                 &Quantization::Int8,
             ) {
                 Ok(m) => Arc::new(Mutex::new(Box::new(m) as Box<dyn SpeechModel + Send>)),
                 Err(e) => {
-                    eprintln!("❌ Error cargando Parakeet: {}", e);
+                    eprintln!("❌ Error loading Parakeet: {}", e);
                     return;
                 }
             }
         }
     };
 
-    println!("✅ Modelo cargado");
+    println!("✅ Model loaded");
 
-    // Un solo permiso = máximo 1 inferencia simultánea
-    // Sube a 2 si el modelo lo soporta y tienes RAM suficiente
+    // Single permit = max 1 concurrent inference
+    // Bump to 2 if the model supports it and you have enough RAM
     let semaphore = Arc::new(Semaphore::new(1));
 
     let addr = "0.0.0.0:8765";
@@ -314,7 +328,7 @@ async fn main() {
         }
     };
 
-    println!("✅ Servidor listo en ws://{}", addr);
+    println!("✅ Server ready at ws://{}", addr);
 
     let shutdown = Arc::new(Notify::new());
 
@@ -332,16 +346,16 @@ async fn main() {
                         ));
                     }
                     Err(e) => {
-                        eprintln!("❌ Error aceptando conexión: {}", e);
+                        eprintln!("❌ Error accepting connection: {}", e);
                         break;
                     }
                 }
             }
             _ = tokio::signal::ctrl_c() => {
-                println!("\n🛑 Ctrl+C recibido. Cerrando servidor...");
+                println!("\n🛑 Ctrl+C received. Shutting down server...");
                 shutdown.notify_waiters();
                 tokio::time::sleep(std::time::Duration::from_millis(500)).await;
-                println!("✅ Servidor detenido.");
+                println!("✅ Server stopped.");
                 break;
             }
         }
