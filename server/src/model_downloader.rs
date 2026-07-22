@@ -119,5 +119,49 @@ async fn download_model(model: &ModelDefinition) -> Result<(), Box<dyn std::erro
         fs::write(&file_path, &file_content)?;
     }
 
+    for (extra_repo, extra_file) in model.extra_files {
+        let file_path = target_dir.join(extra_file);
+        if file_path.exists() {
+            continue;
+        }
+
+        let file_url = format!("https://huggingface.co/{}/resolve/main/{}", extra_repo, extra_file);
+        println!("Downloading shared dependency {}...", extra_file);
+
+        let response = client.get(&file_url).send().await?;
+        let file_size = response.content_length().unwrap_or(0);
+
+        let pb = if file_size > 0 {
+            let pb = ProgressBar::new(file_size);
+            pb.set_style(
+                ProgressStyle::default_bar()
+                    .template("[{elapsed_precise}] [{bar:30.cyan/blue}] {bytes}/{total_bytes} ({eta})")
+                    .unwrap()
+                    .progress_chars("=>-"),
+            );
+            pb
+        } else {
+            let pb = ProgressBar::new_spinner();
+            pb.set_style(
+                ProgressStyle::default_spinner()
+                    .template("{spinner} {bytes} downloaded")
+                    .unwrap(),
+            );
+            pb
+        };
+
+        let mut file_content = Vec::new();
+        let mut stream = response.bytes_stream();
+
+        while let Some(chunk) = stream.next().await {
+            let chunk = chunk?;
+            file_content.extend_from_slice(&chunk);
+            pb.inc(chunk.len() as u64);
+        }
+
+        pb.finish_and_clear();
+        fs::write(&file_path, &file_content)?;
+    }
+
     Ok(())
 }
