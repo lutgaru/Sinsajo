@@ -32,6 +32,7 @@ struct Args {
 struct ClientMessage {
     #[serde(rename = "type")]
     msg_type: String,
+    #[allow(dead_code)]
     sample_rate: Option<u32>,
 }
 
