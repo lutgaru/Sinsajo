@@ -1,4 +1,5 @@
-﻿use futures_util::StreamExt;
+﻿use crate::config::ModelDefinition;
+use futures_util::StreamExt;
 use indicatif::{ProgressBar, ProgressStyle};
 use reqwest::Client;
 use serde::Deserialize;
@@ -6,10 +7,7 @@ use std::fs;
 use std::io::Write;
 use std::path::Path;
 
-const MODEL_REPO: &str = "istupakov/parakeet-tdt-0.6b-v3-onnx";
 const HF_API: &str = "https://huggingface.co/api/models";
-const HF_RESOLVE: &str = "https://huggingface.co/istupakov/parakeet-tdt-0.6b-v3-onnx/resolve/main";
-const MODEL_DIR: &str = "models/parakeet-tdt-0.6b-v3-onnx";
 
 #[derive(Debug, Deserialize)]
 struct ModelInfo {
@@ -21,20 +19,20 @@ struct Sibling {
     rfilename: String,
 }
 
-pub fn model_exists() -> bool {
-    Path::new(MODEL_DIR).join("config.json").exists()
+pub fn model_exists(model: &ModelDefinition) -> bool {
+    Path::new(model.dir).join("config.json").exists()
 }
 
-pub async fn ensure_model(auto_download: bool) {
-    if model_exists() {
-        println!("✓ Model found in '{}'", MODEL_DIR);
+pub async fn ensure_model(model: &ModelDefinition, auto_download: bool) {
+    if model_exists(model) {
+        println!("✓ Model '{}' found in '{}'", model.display, model.dir);
         return;
     }
 
     if auto_download {
-        println!("📥 Model not found. Downloading (--autodownload-models enabled)...");
+        println!("📥 Model '{}' not found. Downloading...", model.display);
     } else {
-        println!("⚠ Model not found in '{}'", MODEL_DIR);
+        println!("⚠ Model '{}' not found in '{}'", model.display, model.dir);
         print!("Download model automatically? (y/N): ");
         std::io::stdout().flush().unwrap();
         let mut input = String::new();
@@ -46,36 +44,37 @@ pub async fn ensure_model(auto_download: bool) {
         println!("📥 Downloading model...");
     }
 
-    if let Err(e) = download_model().await {
+    if let Err(e) = download_model(model).await {
         eprintln!("❌ Error downloading model: {}", e);
         std::process::exit(1);
     }
-    println!("✅ Model downloaded successfully to '{}'", MODEL_DIR);
+    println!("✅ Model '{}' downloaded successfully to '{}'", model.display, model.dir);
 }
 
-async fn download_model() -> Result<(), Box<dyn std::error::Error>> {
+async fn download_model(model: &ModelDefinition) -> Result<(), Box<dyn std::error::Error>> {
     let client = Client::builder()
         .user_agent("sinsajo-server/0.1.0")
         .build()?;
 
-    // Fetch file list from HuggingFace API
-    let url = format!("{}/{}", HF_API, MODEL_REPO);
+    let url = format!("{}/{}", HF_API, model.repo);
     let resp = client.get(&url).send().await?;
     let info: ModelInfo = resp.json().await?;
 
-    let target_dir = Path::new(MODEL_DIR);
+    let target_dir = Path::new(model.dir);
     fs::create_dir_all(target_dir)?;
 
-    // Filter out .git files/dirs
-    let rfilenames: Vec<&String> = info.siblings.iter()
+    let rfilenames: Vec<&String> = info
+        .siblings
+        .iter()
         .filter(|s| !s.rfilename.starts_with(".git"))
         .map(|s| &s.rfilename)
         .collect();
 
     let total_count = rfilenames.len();
+    let resolve_base = format!("https://huggingface.co/{}/resolve/main", model.repo);
 
     for (i, name) in rfilenames.iter().enumerate() {
-        let file_url = format!("{}/{}", HF_RESOLVE, name);
+        let file_url = format!("{}/{}", resolve_base, name);
         let file_path = target_dir.join(name);
 
         if let Some(parent) = file_path.parent() {
@@ -120,6 +119,5 @@ async fn download_model() -> Result<(), Box<dyn std::error::Error>> {
         fs::write(&file_path, &file_content)?;
     }
 
-    println!("✅ Download complete");
     Ok(())
 }

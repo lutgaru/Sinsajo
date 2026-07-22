@@ -3,6 +3,7 @@ use futures_util::{SinkExt, StreamExt};
 use hound;
 use serde::{Deserialize, Serialize};
 use std::fs;
+use std::io::Write;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -17,13 +18,14 @@ use transcribe_rs::onnx::Quantization;
 use transcribe_rs::SpeechModel;
 use transcribe_rs::TranscribeOptions;
 
+mod config;
 mod model_downloader;
 
 #[derive(Parser)]
 #[command(name = "sinsajo-server", version, about = "Speech-to-text WebSocket server")]
 struct Args {
-    #[arg(long)]
-    autodownload_models: bool,
+    #[arg(long, num_args(0..=1), default_missing_value("ParakeetTDT"))]
+    autodownload_models: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -48,8 +50,6 @@ enum ModelKind {
     Canary180M,
     ParakeetTDT,
 }
-
-const MODEL_KIND: ModelKind = ModelKind::ParakeetTDT;
 
 // Shared sink alias for the main loop and transcription tasks
 type WsSink = Arc<
@@ -278,13 +278,47 @@ async fn handle_connection(
     println!("👋 Connection with {} closed", addr);
 }
 
+fn resolve_model_name(args: &Args) -> String {
+    if let Some(name) = &args.autodownload_models {
+        config::get_model_info(name);
+        config::save_model(name);
+        return name.clone();
+    }
+
+    if let Some(name) = config::load_model() {
+        return name;
+    }
+
+    println!("Select a model:");
+    for (i, m) in config::MODELS.iter().enumerate() {
+        println!("  {}. {} ({})", i + 1, m.name, m.display);
+    }
+    print!("Choice [1]: ");
+    std::io::stdout().flush().unwrap();
+    let mut input = String::new();
+    std::io::stdin().read_line(&mut input).unwrap();
+    let idx = input.trim().parse::<usize>().unwrap_or(1).saturating_sub(1);
+    let idx = idx.min(config::MODELS.len() - 1);
+    let name = config::MODELS[idx].name.to_string();
+    config::save_model(&name);
+    name
+}
+
 #[tokio::main]
 async fn main() {
     let args = Args::parse();
 
-    model_downloader::ensure_model(args.autodownload_models).await;
+    let model_name = resolve_model_name(&args);
+    let model_info = config::get_model_info(&model_name);
+    let auto_download = args.autodownload_models.is_some();
+    model_downloader::ensure_model(model_info, auto_download).await;
 
-    let model: Arc<Mutex<Box<dyn SpeechModel + Send>>> = match MODEL_KIND {
+    let model_kind = match model_name.as_str() {
+        "Canary180M" => ModelKind::Canary180M,
+        _ => ModelKind::ParakeetTDT,
+    };
+
+    let model: Arc<Mutex<Box<dyn SpeechModel + Send>>> = match model_kind {
         ModelKind::Canary180M => {
             println!("🚀 Loading Canary 180M Flash model...");
             match CanaryModel::load(
