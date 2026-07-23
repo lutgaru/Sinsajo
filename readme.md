@@ -1,6 +1,6 @@
 # Sinsajo - Real-Time Local Voice Transcription
 
-A self-hosted real-time voice transcription system that converts speech to text using local AI models. Built with **Flutter** (client) and **Rust** (server), featuring Voice Activity Detection (VAD) and the **Canary 180M Flash** model for fast, accurate transcription.
+A self-hosted real-time voice transcription system that converts speech to text using local AI models. Built with **Flutter** (client) and **Rust** (server), featuring Voice Activity Detection (VAD) and support for **Canary 180M Flash** and **Parakeet TDT 0.6B** models for fast, accurate transcription.
 
 ![Architecture](https://img.shields.io/badge/Architecture-Client%2FServer-blue)
 ![Language](https://img.shields.io/badge/Language-Spanish%20%2F%20English-green)
@@ -21,17 +21,17 @@ A self-hosted real-time voice transcription system that converts speech to text 
 
 ```
 ┌─────────────────┐         WebSocket          ┌──────────────────┐
-│  Flutter Client │ ◄─────────────────────────► │   Rust Server    │
+│  Flutter Client │ ◄─────────────────────────►│   Rust Server    │
 │  (Dart/Silero)  │    PCM 16-bit / JSON       │ (transcribe-rs)  │
-└─────────────────┘                             └──────────────────┘
-       │                                                  │
+└─────────────────┘                            └──────────────────┘
+       │                                                 │
        │ Silero VAD v5                                   │ ONNX Model
        │ (ONNX Runtime)                                  │
-       ▼                                                  ▼
+       ▼                                                 ▼
 ┌─────────────────┐                             ┌──────────────────┐
 │  AudioService   │                             │  Canary 180M     │
-│  + vad package  │                             │  Flash (Int8)    │
-│  (ML-based)     │                             │                  │
+│  + vad package  │                             │  Flash /         │
+│  (ML-based)     │                             │  Parakeet TDT    │
 └─────────────────┘                             └──────────────────┘
 ```
 
@@ -40,8 +40,8 @@ A self-hosted real-time voice transcription system that converts speech to text 
 1. **Audio Capture** - Flutter records PCM 16-bit @ 16kHz
 2. **Voice Activity Detection** - Silero VAD v5 (ML-based) detects speech via ONNX Runtime
 3. **WebSocket Transmission** - Sends only speech chunks (not silence)
-4. **Transcription** - Rust server processes with Canary model
-5. **Audio Recording** - Rust server saves session as WAV to `records/` on clean
+4. **Transcription** - Rust server processes with Canary or Parakeet model
+5. **Audio Recording** - Rust server saves session as WAV to configurable `records/` directory on clean
 6. **Display** - Client shows transcribed text in real-time
 
 ### Protocol
@@ -70,7 +70,8 @@ A self-hosted real-time voice transcription system that converts speech to text 
 - **Runtime**: Tokio (async)
 - **WebSocket**: `tokio-tungstenite`
 - **ML**: `transcribe-rs` (ONNX Runtime)
-- **Model**: Canary 180M Flash (Int8 quantized)
+- **Models**: Canary 180M Flash / Parakeet TDT 0.6B (Int8 quantized)
+- **Auto-download**: Models downloaded automatically from HuggingFace on startup
 
 ## 🚀 Quick Start
 
@@ -78,7 +79,6 @@ A self-hosted real-time voice transcription system that converts speech to text 
 
 - **Flutter** 3.0+ (for client)
 - **Rust** 1.70+ (for server)
-- **Git LFS** (for model download)
 
 ### 1. Clone the Repository
 
@@ -91,20 +91,23 @@ cd sinsajo
 
 ```bash
 # Navigate to server directory
-cd whisper-server
+cd server
 
-# Download the Canary model
-mkdir -p models
-cd models
-git lfs install
-git clone https://huggingface.co/ysdede/canary-180m-flash-onnx
-cd ..
-
-# Build and run
-cargo run --release
+# Build and run (auto-downloads ParakeetTDT model on first run)
+cargo run --release -- --model ParakeetTDT --autodownload-model
 ```
 
 The server will start on `ws://0.0.0.0:8765`
+
+**CLI arguments:**
+
+| Arg | Default | Description |
+|-----|---------|-------------|
+| `--model` | *(prompt)* | Model name: `ParakeetTDT` or `Canary180M` |
+| `--autodownload-model` | `false` | Auto-download model if not found locally |
+| `--port` | `8765` | WebSocket server port |
+| `--model-dir` | `./models` | Directory to store model files |
+| `--records-dir` | `./records` | Directory to save WAV recordings |
 
 ### 3. Setup Client (Flutter)
 
@@ -126,26 +129,17 @@ flutter run
 
 ### Server Configuration
 
-Edit `whisper-server/src/main.rs`:
+All server settings are configured via CLI arguments:
 
-```rust
-// Change port
-let addr = "0.0.0.0:8765";
+```bash
+# Use Parakeet model on custom port with explicit paths
+cargo run --release -- --model ParakeetTDT --autodownload-model --port 8080 --model-dir /data/models --records-dir /data/records
 
-// Change model path
-let model = CanaryModel::load(
-    &PathBuf::from("models/canary-180m-flash-onnx"),
-    &Quantization::Int8,
-)?;
-
-// Change language (default: Spanish)
-CanaryParams {
-    language: Some("es".to_string()),  // "en" for English
-    use_pnc: true,                      // Punctuation & capitalization
-    use_itn: true,                      // Number normalization
-    ..Default::default()
-}
+# Use Canary model (smaller, faster)
+cargo run --release -- --model Canary180M --autodownload-model
 ```
+
+If `--model` is omitted, the server checks for a saved config file (`sinsajo-config.json`), then falls back to an interactive prompt.
 
 ### Client Configuration
 
@@ -191,7 +185,7 @@ await _vadHandler.startListening(
 
 1. **Start the server** on your machine:
    ```bash
-   cd whisper-server && cargo run --release
+   cd server && cargo run --release -- --autodownload-model
    ```
 
 2. **Launch the Flutter app** on your device
@@ -266,7 +260,7 @@ minSpeechFrames: 2,             // Lower for faster response
 1. Use Int8 quantized model (faster, slightly less accurate)
 2. Enable GPU acceleration (CUDA/DirectML)
 3. Reduce chunk size in VAD config
-4. Use smaller model (Canary 180M vs Parakeet 600M)
+4. Use smaller model: `--model Canary180M` (180M vs 600M parameters)
 
 ## 📁 Project Structure
 
@@ -285,13 +279,14 @@ sinsajo/
 │   ├── pubspec.yaml
 │   └── README.md
 │
-├── whisper-server/              # Rust server
+├── server/                      # Rust server
 │   ├── src/
-│   │   └── main.rs             # WebSocket + transcription
-│   ├── models/
-│   │   └── canary-180m-flash-onnx/  # AI model
+│   │   ├── main.rs             # WebSocket + transcription
+│   │   ├── config.rs           # Model definitions & config persistence
+│   │   └── model_downloader.rs # HuggingFace auto-download
+│   ├── models/                  # Downloaded ONNX models
 │   ├── Cargo.toml
-│   └── README.md
+│   └── Dockerfile
 │
 └── README.md                    # This file
 ```
@@ -300,17 +295,17 @@ sinsajo/
 
 ### Adding New Models
 
-Replace Canary with other models from `transcribe-rs`:
+Switch between supported models via `--model`:
 
-```rust
-// Use Parakeet (larger, more accurate)
-use transcribe_rs::onnx::parakeet::{ParakeetModel, ParakeetParams};
+```bash
+# Parakeet TDT 0.6B (larger, more accurate, default)
+cargo run --release -- --model ParakeetTDT --autodownload-model
 
-let model = ParakeetModel::load(
-    &PathBuf::from("models/parakeet-tdt-0.6b-v3-int8"),
-    &Quantization::Int8,
-)?;
+# Canary 180M (smaller, faster)
+cargo run --release -- --model Canary180M --autodownload-model
 ```
+
+To add a new model, edit `server/src/config.rs` and add an entry to the `MODELS` array with the HuggingFace repository and folder name.
 
 ### Enabling GPU Acceleration
 
@@ -349,17 +344,9 @@ let result = model.transcribe_with(
 - [x] Session restart without crashes
 
 ### In Progress 🔄
-- [ ] Model switching UI
+- [ ] Model switching UI (client)
 - [x] Audio recording (WAV export)
 - [ ] Export transcriptions (TXT, SRT)
-
-### Planned 📅
-- [ ] GPU acceleration (CUDA/DirectML)
-- [ ] Audio compression (Opus codec)
-- [ ] WebSocket authentication
-- [ ] Multi-language support
-- [ ] Offline mode (bundled server)
-- [ ] Performance metrics dashboard
 
 ## 🐛 Known Limitations
 
@@ -367,7 +354,8 @@ let result = model.transcribe_with(
 - Int8 model has ~2% lower accuracy than Float32
 - Single language per session (no mixed languages)
 - No authentication (local network only)
-- Model and ONNX Runtime loading takes ~2-3 seconds on first run
+- First run downloads the model (~2-3 GB) from HuggingFace
+- Model and ONNX Runtime loading takes ~2-3 seconds on startup
 
 ## 📄 License
 
