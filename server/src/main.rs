@@ -24,8 +24,11 @@ mod model_downloader;
 #[derive(Parser)]
 #[command(name = "sinsajo-server", version, about = "Speech-to-text WebSocket server")]
 struct Args {
-    #[arg(long, num_args(0..=1), default_missing_value("ParakeetTDT"))]
-    autodownload_models: Option<String>,
+    #[arg(long)]
+    model: Option<String>,
+
+    #[arg(long)]
+    autodownload_model: bool,
 
     #[arg(long, default_value = "8765")]
     port: u16,
@@ -291,7 +294,7 @@ async fn handle_connection(
 }
 
 fn resolve_model_name(args: &Args) -> String {
-    if let Some(name) = &args.autodownload_models {
+    if let Some(name) = &args.model {
         config::get_model_info(name);
         config::save_model(name);
         return name.clone();
@@ -322,7 +325,7 @@ async fn main() {
 
     let model_name = resolve_model_name(&args);
     let model_info = config::get_model_info(&model_name);
-    let auto_download = args.autodownload_models.is_some();
+    let auto_download = args.autodownload_model;
     model_downloader::ensure_model(model_info, &args.model_dir, auto_download).await;
 
     let model_kind = match model_name.as_str() {
