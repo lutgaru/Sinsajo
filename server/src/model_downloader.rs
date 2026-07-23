@@ -6,6 +6,7 @@ use serde::Deserialize;
 use std::fs;
 use std::io::Write;
 use std::path::Path;
+use std::path::PathBuf;
 
 const HF_API: &str = "https://huggingface.co/api/models";
 
@@ -19,12 +20,12 @@ struct Sibling {
     rfilename: String,
 }
 
-pub fn model_exists(model: &ModelDefinition) -> bool {
-    Path::new(model.dir).join("config.json").exists()
+pub fn model_exists(model: &ModelDefinition, model_dir: &Path) -> bool {
+    model_dir.join(model.dir).join("config.json").exists()
 }
 
-pub async fn ensure_model(model: &ModelDefinition, auto_download: bool) {
-    if model_exists(model) {
+pub async fn ensure_model(model: &ModelDefinition, model_dir: &Path, auto_download: bool) {
+    if model_exists(model, model_dir) {
         println!("✓ Model '{}' found in '{}'", model.display, model.dir);
         return;
     }
@@ -44,14 +45,14 @@ pub async fn ensure_model(model: &ModelDefinition, auto_download: bool) {
         println!("📥 Downloading model...");
     }
 
-    if let Err(e) = download_model(model).await {
+    if let Err(e) = download_model(model, model_dir).await {
         eprintln!("❌ Error downloading model: {}", e);
         std::process::exit(1);
     }
     println!("✅ Model '{}' downloaded successfully to '{}'", model.display, model.dir);
 }
 
-async fn download_model(model: &ModelDefinition) -> Result<(), Box<dyn std::error::Error>> {
+async fn download_model(model: &ModelDefinition, model_dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
     let client = Client::builder()
         .user_agent("sinsajo-server/0.1.0")
         .build()?;
@@ -60,8 +61,8 @@ async fn download_model(model: &ModelDefinition) -> Result<(), Box<dyn std::erro
     let resp = client.get(&url).send().await?;
     let info: ModelInfo = resp.json().await?;
 
-    let target_dir = Path::new(model.dir);
-    fs::create_dir_all(target_dir)?;
+    let target_dir = PathBuf::from(model_dir).join(model.dir);
+    fs::create_dir_all(&target_dir)?;
 
     let rfilenames: Vec<&String> = info
         .siblings

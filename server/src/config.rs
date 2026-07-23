@@ -21,14 +21,14 @@ pub const MODELS: &[ModelDefinition] = &[
     ModelDefinition {
         name: "ParakeetTDT",
         repo: "istupakov/parakeet-tdt-0.6b-v3-onnx",
-        dir: "models/parakeet-tdt-0.6b-v3-onnx",
+        dir: "parakeet-tdt-0.6b-v3-onnx",
         display: "Parakeet TDT 0.6b v3",
         extra_files: &[],
     },
     ModelDefinition {
         name: "Canary180M",
         repo: "istupakov/canary-180m-flash-onnx",
-        dir: "models/canary-180m-flash-onnx",
+        dir: "canary-180m-flash-onnx",
         display: "Canary 180M Flash",
         extra_files: &[("istupakov/parakeet-tdt-0.6b-v3-onnx", "nemo128.onnx")],
     },

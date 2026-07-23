@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io::Write;
 use std::net::SocketAddr;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::SystemTime;
 use tokio::net::{TcpListener, TcpStream};
@@ -26,6 +26,15 @@ mod model_downloader;
 struct Args {
     #[arg(long, num_args(0..=1), default_missing_value("ParakeetTDT"))]
     autodownload_models: Option<String>,
+
+    #[arg(long, default_value = "8765")]
+    port: u16,
+
+    #[arg(long, default_value = "models")]
+    model_dir: PathBuf,
+
+    #[arg(long, default_value = "records")]
+    records_dir: PathBuf,
 }
 
 #[derive(Debug, Deserialize)]
@@ -64,7 +73,7 @@ async fn send_msg(write: &WsSink, msg: ServerMessage) {
     }
 }
 
-async fn save_audio(audio_buffer: &[f32]) {
+async fn save_audio(audio_buffer: &[f32], records_dir: &Path) {
     if audio_buffer.is_empty() {
         return;
     }
@@ -72,7 +81,8 @@ async fn save_audio(audio_buffer: &[f32]) {
         .duration_since(SystemTime::UNIX_EPOCH)
         .unwrap()
         .as_millis();
-    let filename = format!("records/{}.wav", ts);
+    let filename = records_dir.join(format!("{}.wav", ts));
+    let filename = filename.to_string_lossy().to_string();
     let spec = hound::WavSpec {
         channels: 1,
         sample_rate: 16000,
@@ -142,6 +152,7 @@ async fn handle_connection(
     model: Arc<Mutex<Box<dyn SpeechModel + Send>>>,
     sem: Arc<Semaphore>,
     shutdown: Arc<Notify>,
+    records_dir: PathBuf,
 ) {
     println!("🔗 Client connected: {}", addr);
 
@@ -157,7 +168,7 @@ async fn handle_connection(
     // Arc<Mutex<sink>> shared between the main loop and transcription tasks
     let write: WsSink = Arc::new(Mutex::new(write_half));
 
-    let _ = fs::create_dir_all("records");
+    let _ = fs::create_dir_all(&records_dir);
     let mut audio_buffer: Vec<f32> = Vec::new();
 
     loop {
@@ -203,7 +214,7 @@ async fn handle_connection(
                                 }).await;
                             }
                             "clean" => {
-                                save_audio(&audio_buffer).await;
+                                save_audio(&audio_buffer, &records_dir).await;
                                 audio_buffer.clear();
                                 send_msg(&write, ServerMessage {
                                     msg_type: "status".to_string(),
@@ -253,12 +264,12 @@ async fn handle_connection(
                     // ── Clean close ───────────────────────────────────────
                     Some(Ok(Message::Close(_))) | None => {
                         println!("👋 Client disconnected: {}", addr);
-                        save_audio(&audio_buffer).await;
+                        save_audio(&audio_buffer, &records_dir).await;
                         break;
                     }
                     Some(Err(e)) => {
                         eprintln!("WebSocket error ({}): {}", addr, e);
-                        save_audio(&audio_buffer).await;
+                        save_audio(&audio_buffer, &records_dir).await;
                         break;
                     }
                     _ => {}
@@ -268,7 +279,7 @@ async fn handle_connection(
             // ── Shutdown global (Ctrl+C) ──────────────────────────────────
             _ = shutdown.notified() => {
                 println!("🛑 Shutdown: closing {}", addr);
-                save_audio(&audio_buffer).await;
+                save_audio(&audio_buffer, &records_dir).await;
                 let mut w = write.lock().await;
                 let _ = w.close().await;
                 break;
@@ -312,20 +323,19 @@ async fn main() {
     let model_name = resolve_model_name(&args);
     let model_info = config::get_model_info(&model_name);
     let auto_download = args.autodownload_models.is_some();
-    model_downloader::ensure_model(model_info, auto_download).await;
+    model_downloader::ensure_model(model_info, &args.model_dir, auto_download).await;
 
     let model_kind = match model_name.as_str() {
         "Canary180M" => ModelKind::Canary180M,
         _ => ModelKind::ParakeetTDT,
     };
 
+    let model_path = args.model_dir.join(model_info.dir);
+
     let model: Arc<Mutex<Box<dyn SpeechModel + Send>>> = match model_kind {
         ModelKind::Canary180M => {
             println!("🚀 Loading Canary 180M Flash model...");
-            match CanaryModel::load(
-                &PathBuf::from("models/canary-180m-flash-onnx"),
-                &Quantization::Int8,
-            ) {
+            match CanaryModel::load(&model_path, &Quantization::Int8) {
                 Ok(m) => Arc::new(Mutex::new(Box::new(m) as Box<dyn SpeechModel + Send>)),
                 Err(e) => {
                     eprintln!("❌ Error loading Canary: {}", e);
@@ -335,10 +345,7 @@ async fn main() {
         }
         ModelKind::ParakeetTDT => {
             println!("🚀 Loading Parakeet TDT 0.6b v3 model...");
-            match ParakeetModel::load(
-                &PathBuf::from("models/parakeet-tdt-0.6b-v3-onnx"),
-                &Quantization::Int8,
-            ) {
+            match ParakeetModel::load(&model_path, &Quantization::Int8) {
                 Ok(m) => Arc::new(Mutex::new(Box::new(m) as Box<dyn SpeechModel + Send>)),
                 Err(e) => {
                     eprintln!("❌ Error loading Parakeet: {}", e);
@@ -354,8 +361,8 @@ async fn main() {
     // Bump to 2 if the model supports it and you have enough RAM
     let semaphore = Arc::new(Semaphore::new(1));
 
-    let addr = "0.0.0.0:8765";
-    let listener = match TcpListener::bind(addr).await {
+    let bind_addr = format!("0.0.0.0:{}", args.port);
+    let listener = match TcpListener::bind(&bind_addr).await {
         Ok(l) => l,
         Err(e) => {
             eprintln!("❌ Error binding: {}", e);
@@ -363,7 +370,7 @@ async fn main() {
         }
     };
 
-    println!("✅ Server ready at ws://{}", addr);
+    println!("✅ Server ready at ws://{}", bind_addr);
 
     let shutdown = Arc::new(Notify::new());
 
@@ -378,6 +385,7 @@ async fn main() {
                             Arc::clone(&model),
                             Arc::clone(&semaphore),
                             Arc::clone(&shutdown),
+                            args.records_dir.clone(),
                         ));
                     }
                     Err(e) => {
