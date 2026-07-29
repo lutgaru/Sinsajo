@@ -12,14 +12,9 @@ use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::{Mutex, Notify, Semaphore};
 use tokio_tungstenite::accept_async;
 use tokio_tungstenite::tungstenite::Message;
-use transcribe_rs::onnx::canary::CanaryModel;
-use transcribe_rs::onnx::parakeet::ParakeetModel;
-use transcribe_rs::onnx::Quantization;
-use transcribe_rs::SpeechModel;
-use transcribe_rs::TranscribeOptions;
 
 mod config;
-mod model_downloader;
+mod model;
 
 #[derive(Parser)]
 #[command(name = "sinsajo-server", version, about = "Speech-to-text WebSocket server")]
@@ -56,12 +51,6 @@ struct ServerMessage {
     text: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     message: Option<String>,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum ModelKind {
-    Canary180M,
-    ParakeetTDT,
 }
 
 // Shared sink alias for the main loop and transcription tasks
@@ -103,7 +92,7 @@ async fn save_audio(audio_buffer: &[f32], records_dir: &Path) {
 
 async fn transcribe_and_send(
     samples: Vec<f32>,
-    model: Arc<Mutex<Box<dyn SpeechModel + Send>>>,
+    model: Arc<Mutex<Box<dyn model::Model>>>,
     sem: Arc<Semaphore>,
     write: WsSink,
 ) {
@@ -113,12 +102,8 @@ async fn transcribe_and_send(
     };
 
     let mut lock = model.lock().await;
-    match lock.transcribe(&samples, &TranscribeOptions {
-        language: Some("en".to_string()),
-        ..Default::default()
-    }) {
-        Ok(result) => {
-            let text = result.text.trim().to_string();
+    match lock.transcribe(&samples) {
+        Ok(text) => {
             if !text.is_empty() {
                 println!("✅ Transcription: '{}'", text);
                 send_msg(
@@ -152,7 +137,7 @@ async fn transcribe_and_send(
 async fn handle_connection(
     stream: TcpStream,
     addr: SocketAddr,
-    model: Arc<Mutex<Box<dyn SpeechModel + Send>>>,
+    model: Arc<Mutex<Box<dyn model::Model>>>,
     sem: Arc<Semaphore>,
     shutdown: Arc<Notify>,
     records_dir: PathBuf,
@@ -326,35 +311,18 @@ async fn main() {
     let model_name = resolve_model_name(&args);
     let model_info = config::get_model_info(&model_name);
     let auto_download = args.autodownload_model;
-    model_downloader::ensure_model(model_info, &args.model_dir, auto_download).await;
-
-    let model_kind = match model_name.as_str() {
-        "Canary180M" => ModelKind::Canary180M,
-        _ => ModelKind::ParakeetTDT,
-    };
+    model::download(model_info, &args.model_dir, auto_download).await;
 
     let model_path = args.model_dir.join(model_info.dir);
 
-    let model: Arc<Mutex<Box<dyn SpeechModel + Send>>> = match model_kind {
-        ModelKind::Canary180M => {
-            println!("🚀 Loading Canary 180M Flash model...");
-            match CanaryModel::load(&model_path, &Quantization::Int8) {
-                Ok(m) => Arc::new(Mutex::new(Box::new(m) as Box<dyn SpeechModel + Send>)),
-                Err(e) => {
-                    eprintln!("❌ Error loading Canary: {}", e);
-                    return;
-                }
-            }
+    let model: Arc<Mutex<Box<dyn model::Model>>> = match model::load_from_disk(&model_name, &model_path) {
+        Ok(m) => {
+            println!("🚀 Loaded {} model", m.name());
+            Arc::new(Mutex::new(m))
         }
-        ModelKind::ParakeetTDT => {
-            println!("🚀 Loading Parakeet TDT 0.6b v3 model...");
-            match ParakeetModel::load(&model_path, &Quantization::Int8) {
-                Ok(m) => Arc::new(Mutex::new(Box::new(m) as Box<dyn SpeechModel + Send>)),
-                Err(e) => {
-                    eprintln!("❌ Error loading Parakeet: {}", e);
-                    return;
-                }
-            }
+        Err(e) => {
+            eprintln!("❌ Error loading model: {}", e);
+            return;
         }
     };
 

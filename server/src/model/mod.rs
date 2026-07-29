@@ -1,12 +1,14 @@
-﻿use crate::config::ModelDefinition;
+use crate::config::ModelDefinition;
 use futures_util::StreamExt;
 use indicatif::{ProgressBar, ProgressStyle};
 use reqwest::Client;
 use serde::Deserialize;
 use std::fs;
 use std::io::Write;
-use std::path::Path;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+
+mod canary;
+mod parakeet;
 
 const HF_API: &str = "https://huggingface.co/api/models";
 
@@ -20,20 +22,25 @@ struct Sibling {
     rfilename: String,
 }
 
-pub fn model_exists(model: &ModelDefinition, model_dir: &Path) -> bool {
-    model_dir.join(model.dir).join("config.json").exists()
+pub trait Model: Send {
+    fn name(&self) -> &'static str;
+    fn transcribe(&mut self, samples: &[f32]) -> Result<String, Box<dyn std::error::Error + Send + Sync>>;
 }
 
-pub async fn ensure_model(model: &ModelDefinition, model_dir: &Path, auto_download: bool) {
-    if model_exists(model, model_dir) {
-        println!("✓ Model '{}' found in '{}'", model.display, model.dir);
+pub fn exists(definition: &ModelDefinition, model_dir: &Path) -> bool {
+    model_dir.join(definition.dir).join("config.json").exists()
+}
+
+pub async fn download(definition: &ModelDefinition, model_dir: &Path, auto_download: bool) {
+    if exists(definition, model_dir) {
+        println!("✓ Model '{}' found in '{}'", definition.display, definition.dir);
         return;
     }
 
     if auto_download {
-        println!("📥 Model '{}' not found. Downloading...", model.display);
+        println!("📥 Model '{}' not found. Downloading...", definition.display);
     } else {
-        println!("⚠ Model '{}' not found in '{}'", model.display, model.dir);
+        println!("⚠ Model '{}' not found in '{}'", definition.display, definition.dir);
         print!("Download model automatically? (y/N): ");
         std::io::stdout().flush().unwrap();
         let mut input = String::new();
@@ -45,23 +52,23 @@ pub async fn ensure_model(model: &ModelDefinition, model_dir: &Path, auto_downlo
         println!("📥 Downloading model...");
     }
 
-    if let Err(e) = download_model(model, model_dir).await {
+    if let Err(e) = download_files(definition, model_dir).await {
         eprintln!("❌ Error downloading model: {}", e);
         std::process::exit(1);
     }
-    println!("✅ Model '{}' downloaded successfully to '{}'", model.display, model.dir);
+    println!("✅ Model '{}' downloaded successfully to '{}'", definition.display, definition.dir);
 }
 
-async fn download_model(model: &ModelDefinition, model_dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
+async fn download_files(definition: &ModelDefinition, model_dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
     let client = Client::builder()
         .user_agent("sinsajo-server/0.1.0")
         .build()?;
 
-    let url = format!("{}/{}", HF_API, model.repo);
+    let url = format!("{}/{}", HF_API, definition.repo);
     let resp = client.get(&url).send().await?;
     let info: ModelInfo = resp.json().await?;
 
-    let target_dir = PathBuf::from(model_dir).join(model.dir);
+    let target_dir = PathBuf::from(model_dir).join(definition.dir);
     fs::create_dir_all(&target_dir)?;
 
     let rfilenames: Vec<&String> = info
@@ -72,7 +79,7 @@ async fn download_model(model: &ModelDefinition, model_dir: &Path) -> Result<(),
         .collect();
 
     let total_count = rfilenames.len();
-    let resolve_base = format!("https://huggingface.co/{}/resolve/main", model.repo);
+    let resolve_base = format!("https://huggingface.co/{}/resolve/main", definition.repo);
 
     for (i, name) in rfilenames.iter().enumerate() {
         let file_url = format!("{}/{}", resolve_base, name);
@@ -116,11 +123,10 @@ async fn download_model(model: &ModelDefinition, model_dir: &Path) -> Result<(),
         }
 
         pb.finish_and_clear();
-
         fs::write(&file_path, &file_content)?;
     }
 
-    for (extra_repo, extra_file) in model.extra_files {
+    for (extra_repo, extra_file) in definition.extra_files {
         let file_path = target_dir.join(extra_file);
         if file_path.exists() {
             continue;
@@ -165,4 +171,12 @@ async fn download_model(model: &ModelDefinition, model_dir: &Path) -> Result<(),
     }
 
     Ok(())
+}
+
+pub fn load_from_disk(name: &str, path: &Path) -> Result<Box<dyn Model>, Box<dyn std::error::Error + Send + Sync>> {
+    match name {
+        "Canary180M" => canary::load(path),
+        "ParakeetTDT" => parakeet::load(path),
+        _ => Err(format!("Unknown model '{}'", name).into()),
+    }
 }
