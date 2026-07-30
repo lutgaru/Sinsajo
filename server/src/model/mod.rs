@@ -1,8 +1,7 @@
-use crate::config::ModelDefinition;
 use futures_util::StreamExt;
 use indicatif::{ProgressBar, ProgressStyle};
 use reqwest::Client;
-use serde::Deserialize;
+use std::collections::HashSet;
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -10,28 +9,107 @@ use std::path::{Path, PathBuf};
 mod canary;
 mod parakeet;
 
-const HF_API: &str = "https://huggingface.co/api/models";
+// ── Model metadata types ───────────────────────────────────────────────────────
 
-#[derive(Debug, Deserialize)]
-struct ModelInfo {
-    siblings: Vec<Sibling>,
+#[derive(Debug, Clone)]
+pub struct ModelFile {
+    pub repo: &'static str,
+    pub path: &'static str,
 }
 
-#[derive(Debug, Deserialize)]
-struct Sibling {
-    rfilename: String,
+pub struct ModelDefinition {
+    pub name: &'static str,
+    pub dir: &'static str,
+    pub display: &'static str,
+    pub files: &'static [ModelFile],
 }
+
+pub const MODELS: &[&ModelDefinition] = &[&canary::DEFINITION, &parakeet::DEFINITION];
+
+pub fn get_model_info(name: &str) -> &'static ModelDefinition {
+    MODELS.iter().find(|m| m.name == name).copied().unwrap_or_else(|| {
+        eprintln!(
+            "Unknown model '{}'. Valid models: {}",
+            name,
+            MODELS
+                .iter()
+                .map(|m| m.name)
+                .collect::<Vec<_>>()
+                .join(", ")
+        );
+        std::process::exit(1);
+    })
+}
+
+// ── Model trait ────────────────────────────────────────────────────────────────
 
 pub trait Model: Send {
     fn name(&self) -> &'static str;
     fn transcribe(&mut self, samples: &[f32]) -> Result<String, Box<dyn std::error::Error + Send + Sync>>;
 }
 
+// ── Manifest helpers ───────────────────────────────────────────────────────────
+
+const MANIFEST_FILE: &str = ".sinsajo_manifest.json";
+
+fn load_manifest(dir: &Path) -> HashSet<String> {
+    let path = dir.join(MANIFEST_FILE);
+    if !path.exists() {
+        return HashSet::new();
+    }
+    fs::read_to_string(path)
+        .ok()
+        .and_then(|s| serde_json::from_str::<Vec<String>>(&s).ok())
+        .map(|v| v.into_iter().collect())
+        .unwrap_or_default()
+}
+
+fn save_manifest(dir: &Path, files: &HashSet<String>) {
+    let path = dir.join(MANIFEST_FILE);
+    let list: Vec<&String> = files.iter().collect();
+    if let Ok(json) = serde_json::to_string(&list) {
+        let _ = fs::write(path, json);
+    }
+}
+
+fn add_to_manifest(dir: &Path, manifest: &mut HashSet<String>, file: &str) {
+    manifest.insert(file.to_string());
+    save_manifest(dir, manifest);
+}
+
+// ── Public API ─────────────────────────────────────────────────────────────────
+
 pub fn exists(definition: &ModelDefinition, model_dir: &Path) -> bool {
-    model_dir.join(definition.dir).join("config.json").exists()
+    let target_dir = model_dir.join(definition.dir);
+    if !target_dir.exists() {
+        return false;
+    }
+    let manifest = load_manifest(&target_dir);
+    if manifest.is_empty() {
+        return false;
+    }
+    definition.files.iter().all(|f| manifest.contains(f.path) && target_dir.join(f.path).exists())
+}
+
+pub fn verify(definition: &ModelDefinition, model_dir: &Path) -> Result<(), Vec<String>> {
+    let target_dir = model_dir.join(definition.dir);
+    let missing: Vec<String> = definition
+        .files
+        .iter()
+        .filter(|f| !target_dir.join(f.path).exists())
+        .map(|f| format!("  missing: {} ({})", f.path, f.repo))
+        .collect();
+
+    if missing.is_empty() {
+        Ok(())
+    } else {
+        Err(missing)
+    }
 }
 
 pub async fn download(definition: &ModelDefinition, model_dir: &Path, auto_download: bool) {
+    let target_dir = PathBuf::from(model_dir).join(definition.dir);
+
     if exists(definition, model_dir) {
         println!("✓ Model '{}' found in '{}'", definition.display, definition.dir);
         return;
@@ -52,124 +130,88 @@ pub async fn download(definition: &ModelDefinition, model_dir: &Path, auto_downl
         println!("📥 Downloading model...");
     }
 
-    if let Err(e) = download_files(definition, model_dir).await {
-        eprintln!("❌ Error downloading model: {}", e);
-        std::process::exit(1);
-    }
-    println!("✅ Model '{}' downloaded successfully to '{}'", definition.display, definition.dir);
-}
+    fs::create_dir_all(&target_dir).expect("Failed to create model directory");
 
-async fn download_files(definition: &ModelDefinition, model_dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
+    let mut manifest = load_manifest(&target_dir);
+
+    // legacy migration: no manifest yet but files exist on disk
+    if manifest.is_empty() && target_dir.join("config.json").exists() {
+        for file in definition.files {
+            if target_dir.join(file.path).exists() {
+                manifest.insert(file.path.to_string());
+            }
+        }
+        if !manifest.is_empty() {
+            save_manifest(&target_dir, &manifest);
+        }
+    }
+
     let client = Client::builder()
         .user_agent("sinsajo-server/0.1.0")
-        .build()?;
+        .build()
+        .expect("Failed to build HTTP client");
 
-    let url = format!("{}/{}", HF_API, definition.repo);
-    let resp = client.get(&url).send().await?;
-    let info: ModelInfo = resp.json().await?;
-
-    let target_dir = PathBuf::from(model_dir).join(definition.dir);
-    fs::create_dir_all(&target_dir)?;
-
-    let rfilenames: Vec<&String> = info
-        .siblings
-        .iter()
-        .filter(|s| !s.rfilename.starts_with(".git"))
-        .map(|s| &s.rfilename)
-        .collect();
-
-    let total_count = rfilenames.len();
-    let resolve_base = format!("https://huggingface.co/{}/resolve/main", definition.repo);
-
-    for (i, name) in rfilenames.iter().enumerate() {
-        let file_url = format!("{}/{}", resolve_base, name);
-        let file_path = target_dir.join(name);
-
-        if let Some(parent) = file_path.parent() {
-            fs::create_dir_all(parent)?;
-        }
-
-        println!("[{}/{}] Downloading {}...", i + 1, total_count, name);
-
-        let response = client.get(&file_url).send().await?;
-        let file_size = response.content_length().unwrap_or(0);
-
-        let pb = if file_size > 0 {
-            let pb = ProgressBar::new(file_size);
-            pb.set_style(
-                ProgressStyle::default_bar()
-                    .template("[{elapsed_precise}] [{bar:30.cyan/blue}] {bytes}/{total_bytes} ({eta})")
-                    .unwrap()
-                    .progress_chars("=>-"),
-            );
-            pb
-        } else {
-            let pb = ProgressBar::new_spinner();
-            pb.set_style(
-                ProgressStyle::default_spinner()
-                    .template("{spinner} {bytes} downloaded")
-                    .unwrap(),
-            );
-            pb
-        };
-
-        let mut file_content = Vec::new();
-        let mut stream = response.bytes_stream();
-
-        while let Some(chunk) = stream.next().await {
-            let chunk = chunk?;
-            file_content.extend_from_slice(&chunk);
-            pb.inc(chunk.len() as u64);
-        }
-
-        pb.finish_and_clear();
-        fs::write(&file_path, &file_content)?;
-    }
-
-    for (extra_repo, extra_file) in definition.extra_files {
-        let file_path = target_dir.join(extra_file);
-        if file_path.exists() {
+    for file in definition.files {
+        // skip if already in manifest and exists on disk
+        if manifest.contains(file.path) && target_dir.join(file.path).exists() {
+            println!("  ✓ {}", file.path);
             continue;
         }
 
-        let file_url = format!("https://huggingface.co/{}/resolve/main/{}", extra_repo, extra_file);
-        println!("Downloading shared dependency {}...", extra_file);
-
-        let response = client.get(&file_url).send().await?;
-        let file_size = response.content_length().unwrap_or(0);
-
-        let pb = if file_size > 0 {
-            let pb = ProgressBar::new(file_size);
-            pb.set_style(
-                ProgressStyle::default_bar()
-                    .template("[{elapsed_precise}] [{bar:30.cyan/blue}] {bytes}/{total_bytes} ({eta})")
-                    .unwrap()
-                    .progress_chars("=>-"),
-            );
-            pb
-        } else {
-            let pb = ProgressBar::new_spinner();
-            pb.set_style(
-                ProgressStyle::default_spinner()
-                    .template("{spinner} {bytes} downloaded")
-                    .unwrap(),
-            );
-            pb
-        };
-
-        let mut file_content = Vec::new();
-        let mut stream = response.bytes_stream();
-
-        while let Some(chunk) = stream.next().await {
-            let chunk = chunk?;
-            file_content.extend_from_slice(&chunk);
-            pb.inc(chunk.len() as u64);
+        let file_path = target_dir.join(file.path);
+        if let Some(parent) = file_path.parent() {
+            fs::create_dir_all(parent).expect("Failed to create parent directory");
         }
 
-        pb.finish_and_clear();
-        fs::write(&file_path, &file_content)?;
+        let file_url = format!("https://huggingface.co/{}/resolve/main/{}", file.repo, file.path);
+        println!("  📥 {}", file.path);
+
+        if let Err(e) = download_file(&client, &file_url, &file_path).await {
+            eprintln!("  ❌ Error downloading {}: {}", file.path, e);
+            eprintln!("  Run again to resume download");
+            std::process::exit(1);
+        }
+
+        add_to_manifest(&target_dir, &mut manifest, file.path);
     }
 
+    println!("✅ Model '{}' downloaded successfully to '{}'", definition.display, definition.dir);
+}
+
+async fn download_file(client: &Client, url: &str, dest: &Path) -> Result<(), Box<dyn std::error::Error>> {
+    let response = client.get(url).send().await?;
+    let file_size = response.content_length().unwrap_or(0);
+
+    let pb = if file_size > 0 {
+        let pb = ProgressBar::new(file_size);
+        pb.set_style(
+            ProgressStyle::default_bar()
+                .template("[{elapsed_precise}] [{bar:30.cyan/blue}] {bytes}/{total_bytes} ({eta})")
+                .unwrap()
+                .progress_chars("=>-"),
+        );
+        pb
+    } else {
+        let pb = ProgressBar::new_spinner();
+        pb.set_style(
+            ProgressStyle::default_spinner()
+                .template("{spinner} {bytes} downloaded")
+                .unwrap(),
+        );
+        pb
+    };
+
+    let mut file_content = Vec::new();
+    let mut stream = response.bytes_stream();
+
+    while let Some(chunk) = stream.next().await {
+        let chunk = chunk?;
+        file_content.extend_from_slice(&chunk);
+        pb.inc(chunk.len() as u64);
+    }
+
+    pb.finish_and_clear();
+    fs::write(dest, &file_content)?;
     Ok(())
 }
 

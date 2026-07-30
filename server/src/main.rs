@@ -280,7 +280,7 @@ async fn handle_connection(
 
 fn resolve_model_name(args: &Args) -> String {
     if let Some(name) = &args.model {
-        config::get_model_info(name);
+        model::get_model_info(name);
         config::save_model(name);
         return name.clone();
     }
@@ -290,7 +290,7 @@ fn resolve_model_name(args: &Args) -> String {
     }
 
     println!("Select a model:");
-    for (i, m) in config::MODELS.iter().enumerate() {
+    for (i, m) in model::MODELS.iter().enumerate() {
         println!("  {}. {} ({})", i + 1, m.name, m.display);
     }
     print!("Choice [1]: ");
@@ -298,8 +298,8 @@ fn resolve_model_name(args: &Args) -> String {
     let mut input = String::new();
     std::io::stdin().read_line(&mut input).unwrap();
     let idx = input.trim().parse::<usize>().unwrap_or(1).saturating_sub(1);
-    let idx = idx.min(config::MODELS.len() - 1);
-    let name = config::MODELS[idx].name.to_string();
+    let idx = idx.min(model::MODELS.len() - 1);
+    let name = model::MODELS[idx].name.to_string();
     config::save_model(&name);
     name
 }
@@ -309,9 +309,18 @@ async fn main() {
     let args = Args::parse();
 
     let model_name = resolve_model_name(&args);
-    let model_info = config::get_model_info(&model_name);
+    let model_info = model::get_model_info(&model_name);
     let auto_download = args.autodownload_model;
     model::download(model_info, &args.model_dir, auto_download).await;
+
+    if let Err(missing) = model::verify(model_info, &args.model_dir) {
+        eprintln!("❌ Model '{}' is incomplete:", model_info.display);
+        for m in missing {
+            eprintln!("{}", m);
+        }
+        eprintln!("Run again with --autodownload-model to re-download missing files");
+        return;
+    }
 
     let model_path = args.model_dir.join(model_info.dir);
 
