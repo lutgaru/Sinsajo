@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="sinsajo_client/web/sinsajo.svg" alt="Sinsajo Logo" width="200">
+</p>
+
 # Sinsajo - Real-Time Local Voice Transcription
 
 A self-hosted real-time voice transcription system that converts speech to text using local AI models. Built with **Flutter** (client) and **Rust** (server), featuring Voice Activity Detection (VAD) and support for **Canary 180M Flash** and **Parakeet TDT 0.6B** models for fast, accurate transcription.
