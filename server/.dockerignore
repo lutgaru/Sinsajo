@@ -1,0 +1,7 @@
+target/
+.git/
+.gitignore
+*.exe
+models/
+records/
+sinsajo-config.json

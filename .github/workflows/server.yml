@@ -1,7 +1,11 @@
-name: Server CI/CD
+name: Build and Push Server Docker Image
 
 on:
+  release:
+    types: [published]
   push:
+    branches:
+      - main
     paths:
       - 'server/**'
       - '.github/workflows/server.yml'
@@ -9,11 +13,6 @@ on:
     paths:
       - 'server/**'
       - '.github/workflows/server.yml'
-  release:
-    types: [published]
-
-env:
-  CARGO_TERM_COLOR: always
 
 jobs:
   ci:
@@ -23,7 +22,8 @@ jobs:
       run:
         working-directory: server
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v6
 
       - uses: dtolnay/rust-toolchain@stable
 
@@ -37,46 +37,71 @@ jobs:
       - name: Test
         run: cargo test
 
-  release-linux:
+  docker:
     if: github.event_name == 'release' && startsWith(github.event.release.tag_name || '', 'server/')
     needs: ci
-    permissions:
-      contents: write
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: server
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v6
 
-      - uses: dtolnay/rust-toolchain@stable
-
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: server
-
-      - name: Build
-        run: cargo build --release
-
-      - name: Upload Linux binary
+      - name: Compute Docker tag from release
+        id: release_tag
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
         run: |
-          gh release upload "${{ github.event.release.tag_name }}" \
-            "target/release/whisper-server" \
-            --clobber
+          echo "value=${RELEASE_TAG##*/}" >> "$GITHUB_OUTPUT"
 
-  release-windows:
+      - name: Extract Docker image metadata
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ vars.DOCKER_USERNAME }}/sinsajo-server
+          tags: |
+            type=raw,value=${{ steps.release_tag.outputs.value }}
+            type=raw,value=latest,enable=${{ !github.event.release.prerelease }}
+            type=sha,format=short
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v4
+        with:
+          username: ${{ vars.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_API_KEY }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v7
+        with:
+          context: server
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          annotations: ${{ steps.meta.outputs.annotations }}
+          provenance: true
+          sbom: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  binaries:
     if: github.event_name == 'release' && startsWith(github.event.release.tag_name || '', 'server/')
     needs: ci
     permissions:
       contents: write
-    runs-on: windows-latest
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            binary: target/release/sinsajo-server
+          - os: windows-latest
+            binary: target\release\sinsajo-server.exe
+    runs-on: ${{ matrix.os }}
     defaults:
       run:
         working-directory: server
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v6
 
       - uses: dtolnay/rust-toolchain@stable
 
@@ -87,10 +112,9 @@ jobs:
       - name: Build
         run: cargo build --release
 
-      - name: Upload Windows binary
+      - name: Upload binary to release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BINARY: ${{ matrix.binary }}
         run: |
-          gh release upload "${{ github.event.release.tag_name }}" `
-            "target\release\whisper-server.exe" `
-            --clobber
+          gh release upload "${{ github.event.release.tag_name }}" "$BINARY" --clobber
