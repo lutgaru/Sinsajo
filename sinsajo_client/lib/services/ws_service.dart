@@ -2,6 +2,7 @@
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
@@ -33,71 +34,123 @@ class WsService {
 
   Timer?  _reconnectTimer;
   int     _reconnectAttempts = 0;
-  static const int     _maxReconnectAttempts = 10;
-  static const Duration _reconnectDelay      = Duration(seconds: 2);
+  DateTime? _connectedAt;
+
+  // Reconnection policy: exponential backoff with jitter, bounded.
+  // This keeps the retry rate low so a crashed/restarting server is not
+  // hammered by the client (network/device load stays minimal).
+  static const Duration _baseDelay       = Duration(seconds: 1);
+  static const Duration _maxDelay        = Duration(seconds: 15);
+  static const Duration _stableThreshold = Duration(seconds: 10);
+  static const Duration _connectTimeout  = Duration(seconds: 8);
+  static const double   _jitterFactor    = 0.25; // +/-25% random jitter
+  final      Random    _random          = Random();
+  Duration   _currentDelay = _baseDelay;
 
   WsService({required this.url});
+
+  int _connectSeq = 0;
 
   Future<void> connect() async {
     if (_status == WsStatus.connected || _isDisposed) return;
 
+    final seq = ++_connectSeq;
+    _reconnectTimer?.cancel();
     _sub?.cancel();
     _sub = null;
-    await _channel?.sink.close();
+    try {
+      await _channel?.sink.close();
+    } catch (_) {}
     _channel = null;
 
     _intentionalDisconnect = false;
     _setStatus(WsStatus.connecting);
 
     try {
-      _channel = WebSocketChannel.connect(Uri.parse(url));
-      await _channel!.ready;
+      final channel = WebSocketChannel.connect(Uri.parse(url));
+      _channel = channel;
 
-      _setStatus(WsStatus.connected);
-      _reconnectAttempts = 0;
-      debugPrint('[WS] ✅ Connected to $url');
-
-      _sub = _channel!.stream.listen(
+      // Subscribe BEFORE awaiting `ready`: on web, an unreachable server can
+      // leave the handshake future pending forever. With the listener attached
+      // immediately + a timeout we guarantee the retry loop always advances.
+      _sub = channel.stream.listen(
         _onMessage,
         onError: (e) {
           debugPrint('[WS] ❌ Error: $e');
-          _setStatus(WsStatus.error);
           _messageController.add(WsMessage('error', e.toString()));
-          _scheduleReconnect();
+          _handleDisconnect();
         },
         onDone: () {
           debugPrint('[WS] 🔌 Disconnected');
-          _setStatus(WsStatus.disconnected);
-          if (!_intentionalDisconnect && !_isDisposed) {
-            _scheduleReconnect();
-          }
+          _handleDisconnect();
         },
       );
+
+      await channel.ready.timeout(
+        _connectTimeout,
+        onTimeout: () => throw TimeoutException('WS connect timed out'),
+      );
+
+      // A newer connect() started while this one was in flight; ignore it.
+      if (seq != _connectSeq || _isDisposed || _intentionalDisconnect) return;
+
+      _connectedAt = DateTime.now();
+      _setStatus(WsStatus.connected);
+      _reconnectAttempts = 0;
+      debugPrint('[WS] ✅ Connected to $url');
     } catch (e) {
+      if (seq != _connectSeq) return; // superseded by a newer connect().
       debugPrint('[WS] ❌ Connection failed: $e');
-      _setStatus(WsStatus.error);
       _messageController.add(WsMessage('error', 'Connection failed: $e'));
-      if (!_intentionalDisconnect && !_isDisposed) {
-        _scheduleReconnect();
+      _handleDisconnect();
+    }
+  }
+
+  void _handleDisconnect() {
+    if (_isDisposed) return;
+
+    _setStatus(WsStatus.error);
+
+    // If the connection survived long enough to be considered stable
+    // (e.g. a genuine server restart after being up a while), restart the
+    // backoff from its base value so we recover quickly. A crash-looping
+    // server keeps the delay growing instead of being hammered.
+    if (_connectedAt != null) {
+      final uptime = DateTime.now().difference(_connectedAt!);
+      _connectedAt = null;
+      if (uptime >= _stableThreshold) {
+        _currentDelay = _baseDelay;
+        _reconnectAttempts = 0;
       }
+    }
+
+    if (!_intentionalDisconnect && !_isDisposed) {
+      _scheduleReconnect();
     }
   }
 
   void _scheduleReconnect() {
     if (_isDisposed || _intentionalDisconnect) return;
-    if (_reconnectAttempts >= _maxReconnectAttempts) {
-      debugPrint('[WS] ⚠ Max reconnection attempts reached');
-      return;
-    }
-    _reconnectTimer?.cancel();
+    if (_reconnectTimer?.isActive ?? false) return;
+
     _reconnectAttempts++;
-    debugPrint('[WS] 🔄 Retrying in ${_reconnectDelay.inSeconds}s '
-        '(attempt $_reconnectAttempts/$_maxReconnectAttempts)');
-    _reconnectTimer = Timer(_reconnectDelay, () {
+
+    // Jitter avoids a thundering herd of clients reconnecting in sync.
+    final factor  = 1.0 + (_random.nextDouble() * 2 - 1) * _jitterFactor;
+    final delayMs = (_currentDelay.inMilliseconds * factor).round();
+    debugPrint('[WS] 🔄 Reconnect attempt $_reconnectAttempts in '
+        '${(delayMs / 1000).toStringAsFixed(2)}s (backoff: '
+        '${_currentDelay.inMilliseconds}ms)');
+
+    _reconnectTimer = Timer(Duration(milliseconds: delayMs), () {
       if (!_isDisposed && !_intentionalDisconnect) {
         connect();
       }
     });
+
+    // Exponential growth for the next attempt, capped at _maxDelay.
+    final next = _currentDelay * 2;
+    _currentDelay = next > _maxDelay ? _maxDelay : next;
   }
 
   Future<void> disconnect() async {
@@ -110,6 +163,10 @@ class WsService {
 
     await _channel?.sink.close();
     _channel = null;
+
+    _connectedAt = null;
+    _currentDelay = _baseDelay;
+    _reconnectAttempts = 0;
 
     _setStatus(WsStatus.disconnected);
   }

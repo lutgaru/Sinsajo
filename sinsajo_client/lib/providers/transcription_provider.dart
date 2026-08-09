@@ -65,7 +65,17 @@ class TranscriptionNotifier extends Notifier<TranscriptionState> {
     });
 
     _wsStatusSub = _ws.statusStream.listen((s) {
-      state = state.copyWith(wsStatus: s);
+      final wasRecording = state.isRecording;
+      final wasPaused    = state.isPaused;
+      state = state.copyWith(wsStatus: s, clearError: s == WsStatus.connected);
+
+      // The server drops all session state when it crashes/restarts. If we
+      // were recording when the connection dropped, re-register the session
+      // once the socket is back so transcription resumes seamlessly.
+      if (s == WsStatus.connected && wasRecording && !wasPaused) {
+        debugPrint('[WS] 📡 Reopening recording session on reconnect');
+        _ws.sendStart(sampleRate: kSampleRate);
+      }
     });
 
     _wsMessageSub = _ws.messageStream.listen((msg) {
