@@ -33,6 +33,7 @@ class WsService {
   bool _intentionalDisconnect = false;
 
   Timer?  _reconnectTimer;
+  Timer?  _connectTimer;
   int     _reconnectAttempts = 0;
   DateTime? _connectedAt;
 
@@ -56,6 +57,9 @@ class WsService {
 
     final seq = ++_connectSeq;
     _reconnectTimer?.cancel();
+    _reconnectTimer = null;
+    _connectTimer?.cancel();
+    _connectTimer = null;
     _sub?.cancel();
     _sub = null;
     try {
@@ -72,7 +76,8 @@ class WsService {
 
       // Subscribe BEFORE awaiting `ready`: on web, an unreachable server can
       // leave the handshake future pending forever. With the listener attached
-      // immediately + a timeout we guarantee the retry loop always advances.
+      // immediately + a cancellable timeout we guarantee the retry loop always
+      // advances without leaking a timer.
       _sub = channel.stream.listen(
         _onMessage,
         onError: (e) {
@@ -86,10 +91,25 @@ class WsService {
         },
       );
 
-      await channel.ready.timeout(
-        _connectTimeout,
-        onTimeout: () => throw TimeoutException('WS connect timed out'),
+      // Manual timeout instead of Future.timeout: a plain `.timeout()`
+      // timer cannot be cancelled, which breaks widget tests that dispose
+      // the tree while a connect attempt is in flight.
+      final completer = Completer<void>();
+      _connectTimer = Timer(_connectTimeout, () {
+        if (!completer.isCompleted) {
+          completer.completeError(TimeoutException('WS connect timed out'));
+        }
+      });
+      channel.ready.then(
+        (_) {
+          if (!completer.isCompleted) completer.complete();
+        },
+        onError: (e) {
+          if (!completer.isCompleted) completer.completeError(e);
+        },
       );
+
+      await completer.future;
 
       // A newer connect() started while this one was in flight; ignore it.
       if (seq != _connectSeq || _isDisposed || _intentionalDisconnect) return;
@@ -103,6 +123,9 @@ class WsService {
       debugPrint('[WS] ❌ Connection failed: $e');
       _messageController.add(WsMessage('error', 'Connection failed: $e'));
       _handleDisconnect();
+    } finally {
+      _connectTimer?.cancel();
+      _connectTimer = null;
     }
   }
 
@@ -157,11 +180,16 @@ class WsService {
     if (_isDisposed) return;
     _intentionalDisconnect = true;
     _reconnectTimer?.cancel();
+    _reconnectTimer = null;
+    _connectTimer?.cancel();
+    _connectTimer = null;
 
     await _sub?.cancel();
     _sub = null;
 
-    await _channel?.sink.close();
+    try {
+      await _channel?.sink.close();
+    } catch (_) {}
     _channel = null;
 
     _connectedAt = null;
@@ -228,7 +256,17 @@ class WsService {
 
   void dispose() {
     _isDisposed = true;
-    disconnect();
+    _reconnectTimer?.cancel();
+    _reconnectTimer = null;
+    _connectTimer?.cancel();
+    _connectTimer = null;
+    _sub?.cancel();
+    _sub = null;
+    try {
+      _channel?.sink.close();
+    } catch (_) {}
+    _channel = null;
+    _connectedAt = null;
     _statusController.close();
     _messageController.close();
   }
