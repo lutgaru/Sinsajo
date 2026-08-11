@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import '../providers/transcription_provider.dart';
 import '../services/ws_service.dart';
+import 'help_screen.dart';
 import 'settings_screen.dart';
 
 class TranscriptionScreen extends ConsumerStatefulWidget {
@@ -55,6 +56,15 @@ class _TranscriptionScreenState extends ConsumerState<TranscriptionScreen>
       appBar: AppBar(
         title: const Text('Sinsajo client'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.help_outline),
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const HelpScreen()),
+              );
+            },
+            tooltip: 'Help',
+          ),
           IconButton(
             icon: const Icon(Icons.settings),
             onPressed: () {
