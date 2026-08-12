@@ -115,10 +115,37 @@ class _TranscriptionScreenState extends ConsumerState<TranscriptionScreen>
               color: Colors.red.shade900,
               width: double.infinity,
               padding: const EdgeInsets.all(8),
-              child: Text(
-                state.error!,
-                style: const TextStyle(color: Colors.white, fontSize: 12),
-                textAlign: TextAlign.center,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    state.error!,
+                    style: const TextStyle(color: Colors.white, fontSize: 12),
+                    textAlign: TextAlign.center,
+                  ),
+                  if (_isConnectionError(state.error!))
+                    InkWell(
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const HelpScreen(),
+                          ),
+                        );
+                      },
+                      child: const Padding(
+                        padding: EdgeInsets.only(top: 6),
+                        child: Text(
+                          "Can't connect? Open Help for setup instructions",
+                          style: TextStyle(
+                            color: Colors.lightBlueAccent,
+                            fontSize: 12,
+                            decoration: TextDecoration.underline,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ),
 
@@ -251,6 +278,16 @@ class _ControlBar extends StatelessWidget {
 }
 
 // ── WS status indicator ────────────────────────
+
+bool _isConnectionError(String message) {
+  final lower = message.toLowerCase();
+  return lower.contains('connection failed') ||
+      lower.contains('could not be resolved') ||
+      lower.contains('timed out') ||
+      lower.contains('unable to connect') ||
+      lower.contains('no route to host') ||
+      lower.contains('refused');
+}
 
 class _WsStatusDot extends StatelessWidget {
   const _WsStatusDot({required this.status});
