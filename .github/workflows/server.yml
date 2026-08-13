@@ -116,6 +116,5 @@ jobs:
       - name: Upload binary to release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          BINARY: ${{ matrix.binary }}
         run: |
-          gh release upload "${{ github.event.release.tag_name }}" "$BINARY" --clobber
+          gh release upload "${{ github.event.release.tag_name }}" "${{ matrix.binary }}" --clobber

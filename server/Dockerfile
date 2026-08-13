@@ -14,7 +14,8 @@ COPY src ./src
 
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/app/target \
-    cargo build --release
+    cargo build --release \
+    && cp /app/target/release/sinsajo-server /app/sinsajo-server
 
 FROM ubuntu:26.04
 
@@ -24,7 +25,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-COPY --from=builder /app/target/release/sinsajo-server /app/sinsajo-server
+COPY --from=builder /app/sinsajo-server /app/sinsajo-server
 
 RUN mkdir -p /app/models /app/records
 
