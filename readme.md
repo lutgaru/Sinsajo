@@ -103,6 +103,50 @@ cargo run --release -- --model ParakeetTDT --autodownload-model
 
 The server will start on `ws://0.0.0.0:8765`
 
+#### Run the server with Docker
+
+The server is also published to Docker Hub as [lutgaru/sinsajo-server](https://hub.docker.com/r/lutgaru/sinsajo-server):
+
+```bash
+docker pull lutgaru/sinsajo-server:latest
+
+# Run with default settings
+docker run -p 8765:8765 \
+  -v sinsajo_models:/app/models \
+  -v sinsajo_records:/app/records \
+  lutgaru/sinsajo-server:latest
+
+# Run with a specific tag (e.g. a release)
+docker push lutgaru/sinsajo-server:tagname
+```
+
+##### Docker Compose (recommended)
+
+Create a `docker-compose.yml`:
+
+```yaml
+services:
+  sinsajo-server:
+    image: lutgaru/sinsajo-server:latest
+    container_name: sinsajo-server
+    ports:
+      - "8765:8765"
+    volumes:
+      - sinsajo_models:/app/models
+      - sinsajo_records:/app/records
+    restart: unless-stopped
+
+volumes:
+  sinsajo_models:
+  sinsajo_records:
+```
+
+Then start it with:
+
+```bash
+docker compose up -d
+```
+
 **CLI arguments:**
 
 | Arg | Default | Description |
