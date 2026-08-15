@@ -74,7 +74,7 @@ class TranscriptionNotifier extends Notifier<TranscriptionState> {
       // once the socket is back so transcription resumes seamlessly.
       if (s == WsStatus.connected && wasRecording && !wasPaused) {
         debugPrint('[WS] 📡 Reopening recording session on reconnect');
-        _ws.sendStart(sampleRate: kSampleRate);
+        _sendStartWithSettings();
       }
     });
 
@@ -114,6 +114,15 @@ class TranscriptionNotifier extends Notifier<TranscriptionState> {
     }
   }
 
+  void _sendStartWithSettings() {
+    final settings = ref.read(settingsProvider);
+    _ws.sendStart(
+      sampleRate: kSampleRate,
+      saveAudio: settings.saveAudio,
+      format: settings.audioFormat.serverValue,
+    );
+  }
+
   Future<void> startRecording() async {
     if (state.isRecording && !state.isPaused) return;
     if (state.isPaused) {
@@ -127,7 +136,7 @@ class TranscriptionNotifier extends Notifier<TranscriptionState> {
       return;
     }
 
-    _ws.sendStart(sampleRate: kSampleRate);
+    _sendStartWithSettings();
     final settings = ref.read(settingsProvider);
     _audio.gain = settings.micGain;
     await _audio.start(audioSource: settings.audioSource);

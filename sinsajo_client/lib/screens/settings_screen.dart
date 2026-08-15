@@ -116,6 +116,40 @@ class SettingsScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 24),
             Text(
+              'Server audio saving',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Save audio on server'),
+              subtitle: const Text('Store the session recording as a file on the server'),
+              value: settings.saveAudio,
+              onChanged: (value) {
+                ref.read(settingsProvider.notifier).setSaveAudio(value);
+              },
+            ),
+            DropdownButtonFormField<AudioSaveFormat>(
+              initialValue: settings.audioFormat,
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              ),
+              items: AudioSaveFormat.values
+                  .map((f) => DropdownMenuItem(
+                        value: f,
+                        child: Text(f.label),
+                      ))
+                  .toList(),
+              onChanged: settings.saveAudio
+                  ? (value) {
+                      if (value != null) {
+                        ref.read(settingsProvider.notifier).setAudioFormat(value);
+                      }
+                    }
+                  : null,
+            ),
+            const SizedBox(height: 24),
+            Text(
               'Server IP',
               style: Theme.of(context).textTheme.titleMedium,
             ),

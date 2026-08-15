@@ -199,8 +199,17 @@ class WsService {
     _setStatus(WsStatus.disconnected);
   }
 
-  void sendStart({int sampleRate = 16000}) {
-    _sendJson({'type': 'start', 'sample_rate': sampleRate});
+  void sendStart({
+    int sampleRate = 16000,
+    bool saveAudio = true,
+    String format = 'wav',
+  }) {
+    _sendJson({
+      'type': 'start',
+      'sample_rate': sampleRate,
+      'save_audio': saveAudio,
+      'format': format,
+    });
   }
 
   void sendStop() {
