@@ -19,7 +19,7 @@ A self-hosted real-time voice transcription system that converts speech to text 
 - ✅ **Multi-platform** - Android, iOS, Desktop (Flutter)
 - ✅ **Spanish support** - Native Spanish transcription with punctuation
 - ✅ **Self-hosted** - Run on your own hardware
-- ✅ **Audio recording** - Saves session audio as WAV files on clean
+- ✅ **Audio recording** - Saves session audio (WAV/OGG) to the server, configurable from the client settings
 
 ## 🏗️ Architecture
 
@@ -51,10 +51,10 @@ A self-hosted real-time voice transcription system that converts speech to text 
 ### Protocol
 
 **Client → Server:**
-- `{"type": "start", "sample_rate": 16000}` - Start session
+- `{"type": "start", "sample_rate": 16000, "save_audio": true, "format": "wav"}` - Start session with session-scoped audio save settings (`save_audio`: enable/disable, `format`: `wav` or `ogg`)
 - Binary PCM chunks - Audio data
 - `{"type": "stop"}` - End session
-- `{"type": "clean"}` - End session and save recorded audio as WAV
+- `{"type": "clean"}` - End session and save recorded audio as `wav`/`ogg` file
 
 **Server → Client:**
 - `{"type": "transcription", "text": "..."}` - Transcribed text
@@ -155,7 +155,7 @@ docker compose up -d
 | `--autodownload-model` | `false` | Auto-download model if not found locally |
 | `--port` | `8765` | WebSocket server port |
 | `--model-dir` | `./models` | Directory to store model files |
-| `--records-dir` | `./records` | Directory to save WAV recordings |
+| `--records-dir` | `./records` | Directory to save audio recordings (WAV/OGG) |
 
 ### 3. Setup Client (Flutter)
 
