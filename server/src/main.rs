@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io::Write;
 use std::net::SocketAddr;
+use std::num::{NonZeroU32, NonZeroU8};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::SystemTime;
@@ -12,6 +13,7 @@ use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::{Mutex, Notify, Semaphore};
 use tokio_tungstenite::accept_async;
 use tokio_tungstenite::tungstenite::Message;
+use vorbis_rs::VorbisEncoderBuilder;
 
 mod config;
 mod model;
@@ -41,6 +43,8 @@ struct ClientMessage {
     msg_type: String,
     #[allow(dead_code)]
     sample_rate: Option<u32>,
+    save_audio: Option<bool>,
+    format: Option<String>,
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -58,6 +62,46 @@ type WsSink = Arc<
     Mutex<futures_util::stream::SplitSink<tokio_tungstenite::WebSocketStream<TcpStream>, Message>>,
 >;
 
+// ── Audio save settings (session-scoped; supplied on connection start) ──────
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum AudioFormat {
+    Wav,
+    Ogg,
+}
+
+impl AudioFormat {
+    fn from_str(s: &str) -> Option<AudioFormat> {
+        match s.to_ascii_lowercase().as_str() {
+            "wav" | "wave" => Some(AudioFormat::Wav),
+            "ogg" | "vorbis" => Some(AudioFormat::Ogg),
+            _ => None,
+        }
+    }
+
+    fn ext(self) -> &'static str {
+        match self {
+            AudioFormat::Wav => "wav",
+            AudioFormat::Ogg => "ogg",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct SaveSettings {
+    enabled: bool,
+    format: AudioFormat,
+}
+
+impl Default for SaveSettings {
+    fn default() -> Self {
+        SaveSettings {
+            enabled: true,
+            format: AudioFormat::Wav,
+        }
+    }
+}
+
 async fn send_msg(write: &WsSink, msg: ServerMessage) {
     if let Ok(json) = serde_json::to_string(&msg) {
         let mut w = write.lock().await;
@@ -65,29 +109,69 @@ async fn send_msg(write: &WsSink, msg: ServerMessage) {
     }
 }
 
-async fn save_audio(audio_buffer: &[f32], records_dir: &Path) {
-    if audio_buffer.is_empty() {
+async fn save_audio(audio_buffer: &[f32], records_dir: &Path, settings: &SaveSettings) {
+    if !settings.enabled || audio_buffer.is_empty() {
         return;
     }
     let ts = SystemTime::now()
         .duration_since(SystemTime::UNIX_EPOCH)
         .unwrap()
         .as_millis();
-    let filename = records_dir.join(format!("{}.wav", ts));
+    let filename = records_dir.join(format!("{}.{}", ts, settings.format.ext()));
     let filename = filename.to_string_lossy().to_string();
+
+    let saved = match settings.format {
+        AudioFormat::Wav => write_wav(&filename, audio_buffer),
+        AudioFormat::Ogg => write_ogg(&filename, audio_buffer),
+    };
+
+    if saved {
+        println!("💾 Audio saved: {}", filename);
+    }
+}
+
+fn write_wav(filename: &str, audio_buffer: &[f32]) -> bool {
     let spec = hound::WavSpec {
         channels: 1,
         sample_rate: 16000,
         bits_per_sample: 16,
         sample_format: hound::SampleFormat::Int,
     };
-    if let Ok(mut writer) = hound::WavWriter::create(&filename, spec) {
+    if let Ok(mut writer) = hound::WavWriter::create(filename, spec) {
         for &s in audio_buffer {
             let _ = writer.write_sample((s * 32768.0) as i16);
         }
         let _ = writer.finalize();
-        println!("💾 Audio saved: {}", filename);
+        return true;
     }
+    false
+}
+
+fn write_ogg(filename: &str, audio_buffer: &[f32]) -> bool {
+    let file = match fs::File::create(filename) {
+        Ok(f) => f,
+        Err(_) => return false,
+    };
+
+    let mut encoder = match VorbisEncoderBuilder::new(
+        NonZeroU32::new(16000).unwrap(),
+        NonZeroU8::new(1).unwrap(),
+        file,
+    )
+    .and_then(|mut b| b.build())
+    {
+        Ok(e) => e,
+        Err(_) => return false,
+    };
+
+    // Encode in Vorbis-friendly block sizes (window max is 8192 samples).
+    for chunk in audio_buffer.chunks(8192) {
+        if encoder.encode_audio_block([chunk]).is_err() {
+            return false;
+        }
+    }
+
+    encoder.finish().is_ok()
 }
 
 async fn transcribe_and_send(
@@ -158,6 +242,7 @@ async fn handle_connection(
 
     let _ = fs::create_dir_all(&records_dir);
     let mut audio_buffer: Vec<f32> = Vec::new();
+    let mut save_settings = SaveSettings::default();
 
     loop {
         tokio::select! {
@@ -179,6 +264,22 @@ async fn handle_connection(
 
                         match client_msg.msg_type.as_str() {
                             "start" => {
+                                // Audio save settings are session-scoped and
+                                // supplied with the start message, not mutated
+                                // globally through a separate settings call.
+                                if let Some(enabled) = client_msg.save_audio {
+                                    save_settings.enabled = enabled;
+                                }
+                                if let Some(f) = &client_msg.format {
+                                    if let Some(fmt) = AudioFormat::from_str(f) {
+                                        save_settings.format = fmt;
+                                    }
+                                }
+                                println!(
+                                    "▶ Session started (save_audio={}, format={})",
+                                    save_settings.enabled,
+                                    save_settings.format.ext()
+                                );
                                 audio_buffer.clear();
                                 send_msg(&write, ServerMessage {
                                     msg_type: "status".to_string(),
@@ -202,7 +303,7 @@ async fn handle_connection(
                                 }).await;
                             }
                             "clean" => {
-                                save_audio(&audio_buffer, &records_dir).await;
+                                save_audio(&audio_buffer, &records_dir, &save_settings).await;
                                 audio_buffer.clear();
                                 send_msg(&write, ServerMessage {
                                     msg_type: "status".to_string(),
@@ -252,12 +353,12 @@ async fn handle_connection(
                     // ── Clean close ───────────────────────────────────────
                     Some(Ok(Message::Close(_))) | None => {
                         println!("👋 Client disconnected: {}", addr);
-                        save_audio(&audio_buffer, &records_dir).await;
+                        save_audio(&audio_buffer, &records_dir, &save_settings).await;
                         break;
                     }
                     Some(Err(e)) => {
                         eprintln!("WebSocket error ({}): {}", addr, e);
-                        save_audio(&audio_buffer, &records_dir).await;
+                        save_audio(&audio_buffer, &records_dir, &save_settings).await;
                         break;
                     }
                     _ => {}
@@ -267,7 +368,7 @@ async fn handle_connection(
             // ── Shutdown global (Ctrl+C) ──────────────────────────────────
             _ = shutdown.notified() => {
                 println!("🛑 Shutdown: closing {}", addr);
-                save_audio(&audio_buffer, &records_dir).await;
+                save_audio(&audio_buffer, &records_dir, &save_settings).await;
                 let mut w = write.lock().await;
                 let _ = w.close().await;
                 break;
@@ -382,5 +483,69 @@ async fn main() {
                 break;
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn test_samples() -> Vec<f32> {
+        (0..16000)
+            .map(|i| ((i as f32) / 16000.0 * std::f32::consts::PI * 2.0 * 440.0).sin() * 0.5)
+            .collect()
+    }
+
+    #[test]
+    fn write_wav_produces_valid_file() {
+        let path = std::env::temp_dir().join("sinsajo_test.wav");
+        let path = path.to_string_lossy().to_string();
+        assert!(write_wav(&path, &test_samples()));
+        let bytes = std::fs::read(&path).unwrap();
+        assert!(bytes.starts_with(b"RIFF") && bytes.windows(4).any(|w| w == b"WAVE"));
+        std::fs::remove_file(&path).ok();
+    }
+
+    #[test]
+    fn write_ogg_produces_valid_file() {
+        let path = std::env::temp_dir().join("sinsajo_test.ogg");
+        let path = path.to_string_lossy().to_string();
+        assert!(write_ogg(&path, &test_samples()));
+        let bytes = std::fs::read(&path).unwrap();
+        assert!(bytes.starts_with(b"OggS"));
+        assert!(bytes.len() > 200);
+        std::fs::remove_file(&path).ok();
+    }
+
+    #[test]
+    fn save_audio_respects_settings() {
+        let dir = std::env::temp_dir().join("sinsajo_records_test");
+        let _ = fs::create_dir_all(&dir);
+        let before = fs::read_dir(&dir).unwrap().count();
+
+        // disabled → nothing written
+        let disabled = SaveSettings {
+            enabled: false,
+            format: AudioFormat::Wav,
+        };
+        // use a runtime block to stay synchronous with the async fn
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        rt.block_on(save_audio(&test_samples(), &dir, &disabled));
+        assert_eq!(fs::read_dir(&dir).unwrap().count(), before);
+
+        // enabled + enabled formats produce files
+        for fmt in [AudioFormat::Wav, AudioFormat::Ogg] {
+            let settings = SaveSettings {
+                enabled: true,
+                format: fmt,
+            };
+            rt.block_on(save_audio(&test_samples(), &dir, &settings));
+        }
+        assert_eq!(fs::read_dir(&dir).unwrap().count(), before + 2);
+
+        for entry in fs::read_dir(&dir).unwrap() {
+            let _ = fs::remove_file(entry.unwrap().path());
+        }
+        fs::remove_dir(&dir).ok();
     }
 }
