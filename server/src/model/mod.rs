@@ -45,7 +45,14 @@ pub fn get_model_info(name: &str) -> &'static ModelDefinition {
 
 pub trait Model: Send {
     fn name(&self) -> &'static str;
-    fn transcribe(&mut self, samples: &[f32]) -> Result<String, Box<dyn std::error::Error + Send + Sync>>;
+    /// Transcribe `samples`, optionally targeting `target_language` as the output
+    /// language. Models that support translation (Canary) will produce text in
+    /// that language; single-language models (Parakeet, English-only) ignore it.
+    fn transcribe(
+        &mut self,
+        samples: &[f32],
+        target_language: Option<&str>,
+    ) -> Result<String, Box<dyn std::error::Error + Send + Sync>>;
 }
 
 // ── Manifest helpers ───────────────────────────────────────────────────────────

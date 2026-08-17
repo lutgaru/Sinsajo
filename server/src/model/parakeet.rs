@@ -36,7 +36,13 @@ impl Model for ParakeetTDT {
         "ParakeetTDT"
     }
 
-    fn transcribe(&mut self, samples: &[f32]) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
+    fn transcribe(
+        &mut self,
+        samples: &[f32],
+        _target_language: Option<&str>,
+    ) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
+        // Parakeet is English-only and does not support translation; the
+        // target language is accepted for protocol compatibility but ignored.
         let result = self.inner.transcribe(samples, &TranscribeOptions {
             language: Some("en".to_string()),
             ..Default::default()

@@ -1,9 +1,8 @@
 use crate::model::{Model, ModelDefinition, ModelFile};
 use std::path::Path;
 use transcribe_rs::onnx::canary::CanaryModel;
+use transcribe_rs::onnx::canary::CanaryParams;
 use transcribe_rs::onnx::Quantization;
-use transcribe_rs::SpeechModel;
-use transcribe_rs::TranscribeOptions;
 
 pub const DEFINITION: ModelDefinition = ModelDefinition {
     name: "Canary180M",
@@ -35,11 +34,29 @@ impl Model for Canary180M {
         "Canary180M"
     }
 
-    fn transcribe(&mut self, samples: &[f32]) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
-        let result = self.inner.transcribe(samples, &TranscribeOptions {
-            language: Some("en".to_string()),
-            ..Default::default()
-        }).map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
+    fn transcribe(
+        &mut self,
+        samples: &[f32],
+        target_language: Option<&str>,
+    ) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
+        // Canary translates into the requested target language. The source
+        // hint is set to the target so same-language speech is transcribed
+        // natively and foreign speech is translated into it.
+        let params = match target_language {
+            Some(lang) => CanaryParams {
+                language: Some(lang.to_string()),
+                target_language: Some(lang.to_string()),
+                ..Default::default()
+            },
+            None => CanaryParams {
+                language: Some("en".to_string()),
+                ..Default::default()
+            },
+        };
+        let result = self
+            .inner
+            .transcribe_with(samples, &params)
+            .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
         Ok(result.text.trim().to_string())
     }
 }

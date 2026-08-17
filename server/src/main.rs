@@ -45,6 +45,17 @@ struct ClientMessage {
     sample_rate: Option<u32>,
     save_audio: Option<bool>,
     format: Option<String>,
+    target_language: Option<String>,
+}
+
+// BCP-47 language codes the transcription models accept as output language.
+// Canary's vocabulary carries a prompt token for each of these; Parakeet is
+// English-only and ignores the target language.
+fn valid_target_language(s: &str) -> Option<String> {
+    match s.to_ascii_lowercase().as_str() {
+        "en" | "es" | "fr" | "de" | "pt" => Some(s.to_ascii_lowercase()),
+        _ => None,
+    }
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -177,6 +188,7 @@ fn write_ogg(filename: &str, audio_buffer: &[f32]) -> bool {
 async fn transcribe_and_send(
     samples: Vec<f32>,
     model: Arc<Mutex<Box<dyn model::Model>>>,
+    target_language: Option<String>,
     sem: Arc<Semaphore>,
     write: WsSink,
 ) {
@@ -186,7 +198,7 @@ async fn transcribe_and_send(
     };
 
     let mut lock = model.lock().await;
-    match lock.transcribe(&samples) {
+    match lock.transcribe(&samples, target_language.as_deref()) {
         Ok(text) => {
             if !text.is_empty() {
                 println!("✅ Transcription: '{}'", text);
@@ -243,6 +255,7 @@ async fn handle_connection(
     let _ = fs::create_dir_all(&records_dir);
     let mut audio_buffer: Vec<f32> = Vec::new();
     let mut save_settings = SaveSettings::default();
+    let mut session_target_language: Option<String> = None;
 
     loop {
         tokio::select! {
@@ -275,10 +288,14 @@ async fn handle_connection(
                                         save_settings.format = fmt;
                                     }
                                 }
+                                if let Some(lang) = &client_msg.target_language {
+                                    session_target_language = valid_target_language(lang);
+                                }
                                 println!(
-                                    "▶ Session started (save_audio={}, format={})",
+                                    "▶ Session started (save_audio={}, format={}, target_language={})",
                                     save_settings.enabled,
-                                    save_settings.format.ext()
+                                    save_settings.format.ext(),
+                                    session_target_language.as_deref().unwrap_or("en"),
                                 );
                                 audio_buffer.clear();
                                 send_msg(&write, ServerMessage {
@@ -342,9 +359,11 @@ async fn handle_connection(
                         let model_clone = Arc::clone(&model);
                         let sem_clone   = Arc::clone(&sem);
                         let write_clone = Arc::clone(&write);
+                        let target_clone = session_target_language.clone();
                         tokio::spawn(transcribe_and_send(
                             samples,
                             model_clone,
+                            target_clone,
                             sem_clone,
                             write_clone,
                         ));
@@ -515,6 +534,37 @@ mod tests {
         assert!(bytes.starts_with(b"OggS"));
         assert!(bytes.len() > 200);
         std::fs::remove_file(&path).ok();
+    }
+
+    #[test]
+    fn valid_target_language_accepts_supported_codes() {
+        for code in ["en", "es", "fr", "de", "pt"] {
+            assert_eq!(valid_target_language(code), Some(code.to_string()));
+        }
+        // Case-insensitive
+        assert_eq!(valid_target_language("ES"), Some("es".to_string()));
+        assert_eq!(valid_target_language("Pt"), Some("pt".to_string()));
+    }
+
+    #[test]
+    fn valid_target_language_rejects_unknown_codes() {
+        assert_eq!(valid_target_language("xx"), None);
+        assert_eq!(valid_target_language(""), None);
+        assert_eq!(valid_target_language("english"), None);
+    }
+
+    #[test]
+    fn start_message_parses_target_language() {
+        let msg: ClientMessage = serde_json::from_str(
+            r#"{"type":"start","sample_rate":16000,"save_audio":true,"format":"wav","target_language":"es"}"#,
+        )
+        .unwrap();
+        assert_eq!(msg.msg_type, "start");
+        assert_eq!(msg.target_language.as_deref(), Some("es"));
+
+        let msg: ClientMessage = serde_json::from_str(r#"{"type":"start"}"#).unwrap();
+        assert_eq!(msg.msg_type, "start");
+        assert_eq!(msg.target_language, None);
     }
 
     #[test]
