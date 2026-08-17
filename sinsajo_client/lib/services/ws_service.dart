@@ -203,12 +203,14 @@ class WsService {
     int sampleRate = 16000,
     bool saveAudio = true,
     String format = 'wav',
+    String? targetLanguage,
   }) {
     _sendJson({
       'type': 'start',
       'sample_rate': sampleRate,
       'save_audio': saveAudio,
       'format': format,
+      'target_language': ?targetLanguage,
     });
   }
 

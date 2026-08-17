@@ -120,6 +120,7 @@ class TranscriptionNotifier extends Notifier<TranscriptionState> {
       sampleRate: kSampleRate,
       saveAudio: settings.saveAudio,
       format: settings.audioFormat.serverValue,
+      targetLanguage: settings.targetLanguage.code,
     );
   }
 

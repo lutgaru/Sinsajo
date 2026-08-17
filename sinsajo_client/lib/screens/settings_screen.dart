@@ -150,6 +150,30 @@ class SettingsScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 24),
             Text(
+              'Target language',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 8),
+            DropdownButtonFormField<TargetLanguage>(
+              initialValue: settings.targetLanguage,
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              ),
+              items: TargetLanguage.values
+                  .map((l) => DropdownMenuItem(
+                        value: l,
+                        child: Text(l.label),
+                      ))
+                  .toList(),
+              onChanged: (value) {
+                if (value != null) {
+                  ref.read(settingsProvider.notifier).setTargetLanguage(value);
+                }
+              },
+            ),
+            const SizedBox(height: 24),
+            Text(
               'Server IP',
               style: Theme.of(context).textTheme.titleMedium,
             ),

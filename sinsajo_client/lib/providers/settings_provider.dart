@@ -11,18 +11,32 @@ enum AudioSaveFormat {
   String get serverValue => name;
 }
 
+enum TargetLanguage {
+  english('English', 'en'),
+  spanish('Spanish', 'es'),
+  french('French', 'fr'),
+  german('German', 'de'),
+  portuguese('Portuguese', 'pt');
+
+  const TargetLanguage(this.label, this.code);
+  final String label;
+  final String code;
+}
+
 class SettingsState {
   final double micGain;
   final AndroidAudioSource audioSource;
   final String ipAddress;
   final bool saveAudio;
   final AudioSaveFormat audioFormat;
+  final TargetLanguage targetLanguage;
   const SettingsState({
     this.micGain = 1.0,
     this.audioSource = AndroidAudioSource.camcorder,
     this.ipAddress = '192.168.31.21',
     this.saveAudio = true,
     this.audioFormat = AudioSaveFormat.wav,
+    this.targetLanguage = TargetLanguage.english,
   });
 
   SettingsState copyWith({
@@ -31,6 +45,7 @@ class SettingsState {
     String? ipAddress,
     bool? saveAudio,
     AudioSaveFormat? audioFormat,
+    TargetLanguage? targetLanguage,
   }) =>
       SettingsState(
         micGain: micGain ?? this.micGain,
@@ -38,6 +53,7 @@ class SettingsState {
         ipAddress: ipAddress ?? this.ipAddress,
         saveAudio: saveAudio ?? this.saveAudio,
         audioFormat: audioFormat ?? this.audioFormat,
+        targetLanguage: targetLanguage ?? this.targetLanguage,
       );
 }
 
@@ -63,6 +79,10 @@ class SettingsNotifier extends Notifier<SettingsState> {
 
   void setAudioFormat(AudioSaveFormat format) {
     state = state.copyWith(audioFormat: format);
+  }
+
+  void setTargetLanguage(TargetLanguage language) {
+    state = state.copyWith(targetLanguage: language);
   }
 }
 
