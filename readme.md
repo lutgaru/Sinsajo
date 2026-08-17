@@ -18,6 +18,7 @@ A self-hosted real-time voice transcription system that converts speech to text 
 - ✅ **Low latency** - ~150-300ms end-to-end
 - ✅ **Multi-platform** - Android, iOS, Desktop (Flutter)
 - ✅ **Spanish support** - Native Spanish transcription with punctuation
+- ✅ **Target language selection** - Choose the output language (English, Spanish, French, German, Portuguese) from the client settings; translation is applied by models that support it (Canary)
 - ✅ **Self-hosted** - Run on your own hardware
 - ✅ **Audio recording** - Saves session audio (WAV/OGG) to the server, configurable from the client settings
 
@@ -51,7 +52,7 @@ A self-hosted real-time voice transcription system that converts speech to text 
 ### Protocol
 
 **Client → Server:**
-- `{"type": "start", "sample_rate": 16000, "save_audio": true, "format": "wav"}` - Start session with session-scoped audio save settings (`save_audio`: enable/disable, `format`: `wav` or `ogg`)
+- `{"type": "start", "sample_rate": 16000, "save_audio": true, "format": "wav", "target_language": "es"}` - Start session with session-scoped audio save settings (`save_audio`: enable/disable, `format`: `wav` or `ogg`) and output `target_language` (`en`, `es`, `fr`, `de`, `pt`; applied by models that support translation, ignored otherwise)
 - Binary PCM chunks - Audio data
 - `{"type": "stop"}` - End session
 - `{"type": "clean"}` - End session and save recorded audio as `wav`/`ogg` file
@@ -197,6 +198,8 @@ Edit `sinsajo_client/lib/providers/transcription_provider.dart`:
 // Update server IP address
 const String kWsUrl = 'ws://192.168.1.100:8765';  // ← Your server IP
 ```
+
+Other client options (microphone gain, audio source, audio saving, target language, server IP) are configured from the in-app Settings screen.
 
 ### VAD Configuration
 
@@ -369,7 +372,7 @@ set_ort_accelerator(OrtAccelerator::Auto);
 
 ### Adding Translation
 
-Canary supports translation between languages:
+Canary supports selecting an output language via the client "Target language" setting (sent with the `start` message). On the server, the selection is forwarded as `target_language`:
 
 ```rust
 let result = model.transcribe_with(
@@ -381,6 +384,8 @@ let result = model.transcribe_with(
     },
 )?;
 ```
+
+When a target language is set, both `language` and `target_language` are pinned to it, so same-language speech is transcribed natively and foreign speech is translated into the selected language. Parakeet is English-only and ignores the target language.
 
 ## 📋 Roadmap
 
