@@ -13,6 +13,8 @@ class TranscriptionState {
   final WsStatus wsStatus;
   final List<String> segments;
   final String? error;
+  final String? serverModel;
+  final List<String>? supportedLanguages;
 
   const TranscriptionState({
     this.isRecording = false,
@@ -20,6 +22,8 @@ class TranscriptionState {
     this.wsStatus    = WsStatus.disconnected,
     this.segments    = const [],
     this.error,
+    this.serverModel,
+    this.supportedLanguages,
   });
 
   String get fullText => segments.join(' ');
@@ -30,6 +34,8 @@ class TranscriptionState {
     WsStatus?     wsStatus,
     List<String>? segments,
     String?       error,
+    String?       serverModel,
+    List<String>? supportedLanguages,
     bool          clearError = false,
   }) =>
       TranscriptionState(
@@ -38,6 +44,8 @@ class TranscriptionState {
         wsStatus:    wsStatus    ?? this.wsStatus,
         segments:    segments    ?? this.segments,
         error:       clearError ? null : (error ?? this.error),
+        serverModel: serverModel ?? this.serverModel,
+        supportedLanguages: supportedLanguages ?? this.supportedLanguages,
       );
 }
 
@@ -92,6 +100,24 @@ class TranscriptionNotifier extends Notifier<TranscriptionState> {
           break;
         case 'error':
           state = state.copyWith(error: msg.content);
+          break;
+        case 'model_info':
+          final langs = msg.languages;
+          // If the running model no longer supports the selected target
+          // language, fall back to English so the UI never shows a selection
+          // the server cannot honor.
+          if (langs != null && langs.isNotEmpty) {
+            final settings = ref.read(settingsProvider);
+            if (!langs.contains(settings.targetLanguage.code)) {
+              ref
+                  .read(settingsProvider.notifier)
+                  .setTargetLanguage(TargetLanguage.english);
+            }
+          }
+          state = state.copyWith(
+            serverModel: msg.model,
+            supportedLanguages: langs,
+          );
           break;
         case 'status':
           break;

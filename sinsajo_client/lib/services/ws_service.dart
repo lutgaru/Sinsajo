@@ -11,7 +11,9 @@ enum WsStatus { disconnected, connecting, connected, error }
 class WsMessage {
   final String type;
   final String content;
-  WsMessage(this.type, this.content);
+  final String? model;
+  final List<String>? languages;
+  WsMessage(this.type, this.content, {this.model, this.languages});
 }
 
 class WsService {
@@ -253,7 +255,9 @@ class WsService {
       final map  = jsonDecode(raw) as Map<String, dynamic>;
       final type = map['type'] as String? ?? 'unknown';
       final text = (map['text'] ?? map['message'] ?? '') as String;
-      _messageController.add(WsMessage(type, text));
+      final model = map['model'] as String?;
+      final languages = (map['languages'] as List?)?.map((e) => e.toString()).toList();
+      _messageController.add(WsMessage(type, text, model: model, languages: languages));
     } catch (e) {
       debugPrint('[WS] ⚠ Error parsing message: $e');
     }

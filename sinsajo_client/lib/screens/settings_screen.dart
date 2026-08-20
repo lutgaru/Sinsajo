@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:record/record.dart';
 import '../providers/settings_provider.dart';
+import '../providers/transcription_provider.dart';
 import 'help_screen.dart';
 
 class SettingsScreen extends ConsumerWidget {
@@ -10,6 +11,8 @@ class SettingsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final settings = ref.watch(settingsProvider);
+    final modelState = ref.watch(transcriptionProvider);
+    final supportedLanguages = modelState.supportedLanguages;
 
     return Scaffold(
       appBar: AppBar(
@@ -150,6 +153,54 @@ class SettingsScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 24),
             Text(
+              'Server model',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 8),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.memory,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          modelState.serverModel ?? 'Not connected',
+                          style: Theme.of(context).textTheme.titleSmall,
+                        ),
+                        if (supportedLanguages != null) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            'Supported languages: '
+                            '${supportedLanguages.join(', ')}',
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodySmall
+                                ?.copyWith(
+                                  color:
+                                      Theme.of(context).colorScheme.outline,
+                                ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+            Text(
               'Target language',
               style: Theme.of(context).textTheme.titleMedium,
             ),
@@ -163,6 +214,8 @@ class SettingsScreen extends ConsumerWidget {
               items: TargetLanguage.values
                   .map((l) => DropdownMenuItem(
                         value: l,
+                        enabled: supportedLanguages == null ||
+                            supportedLanguages.contains(l.code),
                         child: Text(l.label),
                       ))
                   .toList(),

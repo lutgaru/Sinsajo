@@ -164,6 +164,18 @@ void main() {
 
       expect(newState.error, isNull);
     });
+
+    test('copyWith updates server model info', () {
+      const state = TranscriptionState();
+      final newState = state.copyWith(
+        serverModel: 'Canary180M',
+        supportedLanguages: const ['en', 'es', 'fr', 'de', 'pt'],
+      );
+
+      expect(newState.serverModel, 'Canary180M');
+      expect(newState.supportedLanguages, ['en', 'es', 'fr', 'de', 'pt']);
+      expect(newState.wsStatus, state.wsStatus);
+    });
   });
 
   group('WsMessage', () {
@@ -179,6 +191,26 @@ void main() {
 
       expect(msg.type, 'status');
       expect(msg.content, '');
+    });
+
+    test('stores model info fields', () {
+      final msg = WsMessage(
+        'model_info',
+        '',
+        model: 'Canary180M',
+        languages: const ['en', 'es', 'fr', 'de', 'pt'],
+      );
+
+      expect(msg.type, 'model_info');
+      expect(msg.model, 'Canary180M');
+      expect(msg.languages, ['en', 'es', 'fr', 'de', 'pt']);
+    });
+
+    test('model info fields are null by default', () {
+      final msg = WsMessage('status', 'ready');
+
+      expect(msg.model, isNull);
+      expect(msg.languages, isNull);
     });
   });
 

@@ -67,6 +67,20 @@ void main() {
       expect(state.error, isNull);
     });
 
+    test('model info state handling', () {
+      var state = const TranscriptionState();
+
+      expect(state.serverModel, isNull);
+      expect(state.supportedLanguages, isNull);
+
+      state = state.copyWith(
+        serverModel: 'ParakeetTDT',
+        supportedLanguages: const ['en'],
+      );
+      expect(state.serverModel, 'ParakeetTDT');
+      expect(state.supportedLanguages, ['en']);
+    });
+
     test('complex state update', () {
       var state = const TranscriptionState();
 
