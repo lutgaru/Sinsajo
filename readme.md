@@ -18,7 +18,7 @@ A self-hosted real-time voice transcription system that converts speech to text 
 - ✅ **Low latency** - ~150-300ms end-to-end
 - ✅ **Multi-platform** - Android, iOS, Desktop (Flutter)
 - ✅ **Spanish support** - Native Spanish transcription with punctuation
-- ✅ **Target language selection** - Choose the output language (English, Spanish, French, German, Portuguese) from the client settings; translation is applied by models that support it (Canary)
+- ✅ **Target language selection** - Choose the output language (English, Spanish, French, German, Portuguese) from the client settings; translation is applied by models that support it, and the client only enables the languages the active server model advertises
 - ✅ **Self-hosted** - Run on your own hardware
 - ✅ **Audio recording** - Saves session audio (WAV/OGG) to the server, configurable from the client settings
 
@@ -61,6 +61,7 @@ A self-hosted real-time voice transcription system that converts speech to text 
 - `{"type": "transcription", "text": "..."}` - Transcribed text
 - `{"type": "status", "message": "ready"}` - Status updates
 - `{"type": "error", "message": "..."}` - Error messages
+- `{"type": "model_info", "model": "Canary180M", "languages": ["en", "es", "fr", "de", "pt"]}` - Sent on connect; the loaded model and the target languages it supports (the client shows the model in Settings and enables only the supported language options)
 
 ## 📦 Tech Stack
 
