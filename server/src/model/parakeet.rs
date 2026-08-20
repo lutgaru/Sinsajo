@@ -21,6 +21,9 @@ pub const DEFINITION: ModelDefinition = ModelDefinition {
     ],
 };
 
+// Parakeet is English-only; the client enables only "en".
+const SUPPORTED_LANGUAGES: &[&str] = &["en"];
+
 pub struct ParakeetTDT {
     inner: ParakeetModel,
 }
@@ -34,6 +37,10 @@ impl ParakeetTDT {
 impl Model for ParakeetTDT {
     fn name(&self) -> &'static str {
         "ParakeetTDT"
+    }
+
+    fn supported_languages(&self) -> &'static [&'static str] {
+        SUPPORTED_LANGUAGES
     }
 
     fn transcribe(
@@ -55,4 +62,14 @@ pub fn load(path: &Path) -> Result<Box<dyn Model>, Box<dyn std::error::Error + S
     let inner = ParakeetModel::load(path, &Quantization::Int8)
         .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
     Ok(Box::new(ParakeetTDT::new(inner)))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn english_only_languages() {
+        assert_eq!(SUPPORTED_LANGUAGES, &["en"]);
+    }
 }

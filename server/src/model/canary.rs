@@ -19,6 +19,10 @@ pub const DEFINITION: ModelDefinition = ModelDefinition {
     ],
 };
 
+// Canary vocab carries a prompt token for each of these output languages,
+// so translation is available for all of them.
+const SUPPORTED_LANGUAGES: &[&str] = &["en", "es", "fr", "de", "pt"];
+
 pub struct Canary180M {
     inner: CanaryModel,
 }
@@ -32,6 +36,10 @@ impl Canary180M {
 impl Model for Canary180M {
     fn name(&self) -> &'static str {
         "Canary180M"
+    }
+
+    fn supported_languages(&self) -> &'static [&'static str] {
+        SUPPORTED_LANGUAGES
     }
 
     fn transcribe(
@@ -65,4 +73,19 @@ pub fn load(path: &Path) -> Result<Box<dyn Model>, Box<dyn std::error::Error + S
     let inner = CanaryModel::load(path, &Quantization::Int8)
         .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
     Ok(Box::new(Canary180M::new(inner)))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn supports_all_target_languages() {
+        let expected = ["en", "es", "fr", "de", "pt"];
+        assert_eq!(SUPPORTED_LANGUAGES, expected);
+        // Every advertised language must map to a vocab token so Canary can
+        // build a prompt for it.
+        assert!(expected.contains(&"en"));
+        assert!(expected.contains(&"pt"));
+    }
 }

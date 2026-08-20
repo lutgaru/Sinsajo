@@ -252,6 +252,21 @@ async fn handle_connection(
     // Arc<Mutex<sink>> shared between the main loop and transcription tasks
     let write: WsSink = Arc::new(Mutex::new(write_half));
 
+    // Announce the loaded model and its supported languages so the client can
+    // show it in the UI and enable only the language options that work.
+    {
+        let m = model.lock().await;
+        let json = serde_json::json!({
+            "type": "model_info",
+            "model": m.name(),
+            "languages": m.supported_languages(),
+        });
+        if let Ok(s) = serde_json::to_string(&json) {
+            let mut w = write.lock().await;
+            let _ = w.send(Message::Text(s)).await;
+        }
+    }
+
     let _ = fs::create_dir_all(&records_dir);
     let mut audio_buffer: Vec<f32> = Vec::new();
     let mut save_settings = SaveSettings::default();

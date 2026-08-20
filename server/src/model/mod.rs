@@ -45,9 +45,16 @@ pub fn get_model_info(name: &str) -> &'static ModelDefinition {
 
 pub trait Model: Send {
     fn name(&self) -> &'static str;
+
+    /// Target languages this model can output, as BCP-47 codes
+    /// (e.g. "en", "es"). The client uses this to enable/disable the
+    /// language options it presents to the user.
+    fn supported_languages(&self) -> &'static [&'static str];
+
     /// Transcribe `samples`, optionally targeting `target_language` as the output
     /// language. Models that support translation (Canary) will produce text in
     /// that language; single-language models (Parakeet, English-only) ignore it.
+    /// The caller should only pass languages reported by `supported_languages`.
     fn transcribe(
         &mut self,
         samples: &[f32],
