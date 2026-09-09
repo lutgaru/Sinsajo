@@ -10,6 +10,8 @@ A self-hosted real-time voice transcription system that converts speech to text 
 ![Language](https://img.shields.io/badge/Language-Spanish%20%2F%20English-green)
 ![Privacy](https://img.shields.io/badge/Privacy-100%25%20Local-brightgreen)
 
+> **Docs & Landing:** https://lutgaru.github.io/Sinsajo/ &nbsp;|&nbsp; **Web App:** https://lutgaru.github.io/Sinsajo/app/ &nbsp;|&nbsp; **Downloads:** [Releases](https://github.com/lutgaru/Sinsajo/releases)
+
 ## 🎯 Features
 
 - ✅ **Real-time transcription** - See text as you speak
@@ -318,7 +320,7 @@ minSpeechFrames: 2,             // Lower for faster response
 
 ```
 sinsajo/
-├── sinsajo_client/              # Flutter client
+├── sinsajo_client/              # Flutter client (Android, iOS, Web)
 │   ├── lib/
 │   │   ├── main.dart           # App entry point
 │   │   ├── providers/
@@ -340,8 +342,25 @@ sinsajo/
 │   ├── Cargo.toml
 │   └── Dockerfile
 │
+├── docs-site/                   # Astro Starlight landing + docs -> GitHub Pages
+│   ├── src/content/docs/        # Landing (index.mdx) + guides + reference
+│   ├── astro.config.mjs         # site: https://lutgaru.github.io/Sinsajo/
+│   └── public/sinsajo.svg
+│
 └── README.md                    # This file
 ```
+
+### 🌐 Landing & Docs (docs-site)
+
+Modern static site (Astro + Starlight) deployed to GitHub Pages together with the Flutter Web app:
+
+- `/` → landing + docs
+- `/app/` → Flutter Web build
+- `/releases` → APKs (GitHub Releases)
+
+Local preview: `cd docs-site && npm ci && npm run dev` → http://localhost:4321/Sinsajo/
+
+Deploy: push to `master` triggers `.github/workflows/docs.yml` — builds Astro + `flutter build web --base-href /Sinsajo/app/` and publishes to Pages.
 
 ## 🛠️ Development
 
