@@ -1,0 +1,94 @@
+name: Docs & Web — GitHub Pages
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'docs-site/**'
+      - 'sinsajo_client/**'
+      - '.github/workflows/docs.yml'
+  pull_request:
+    paths:
+      - 'docs-site/**'
+      - 'sinsajo_client/**'
+      - '.github/workflows/docs.yml'
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # --- Flutter Web ---
+      - name: Setup Flutter
+        if: hashFiles('sinsajo_client/pubspec.yaml') != ''
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Get Flutter dependencies
+        working-directory: sinsajo_client
+        run: flutter pub get
+
+      - name: Build Flutter Web
+        working-directory: sinsajo_client
+        run: flutter build web --release --base-href /Sinsajo/app/
+
+      # --- Astro docs-site ---
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: docs-site/package-lock.json
+
+      - name: Install docs deps
+        working-directory: docs-site
+        run: npm ci
+
+      - name: Build Astro
+        working-directory: docs-site
+        run: npm run build
+
+      # Merge Flutter Web into Astro dist/app
+      - name: Merge Flutter web into Astro dist
+        run: |
+          mkdir -p docs-site/dist/app
+          cp -r sinsajo_client/build/web/* docs-site/dist/app/
+          echo "Merged Flutter web:"
+          ls -lh docs-site/dist/app/ | head -n 20
+          echo "Astro dist:"
+          ls -lh docs-site/dist/ | head -n 30
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs-site/dist
+
+  deploy:
+    if: github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
