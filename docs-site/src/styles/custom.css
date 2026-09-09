@@ -1,0 +1,27 @@
+/* Sinsajo brand — warm orange accent */
+:root {
+  --sl-color-accent-low: #3d1f00;
+  --sl-color-accent: #ff8000;
+  --sl-color-accent-high: #ff9f3d;
+  --sl-color-white: #ffffff;
+}
+
+:root[data-theme='light'] {
+  --sl-color-accent-low: #ffe0b3;
+  --sl-color-accent: #d96a00;
+  --sl-color-accent-high: #8a4200;
+}
+
+/* Hero CTA tweak */
+.hero .actions a[data-variant='primary'] {
+  background: #ff8000;
+  border-color: #ff8000;
+}
+
+/* App preview iframe */
+.app-preview {
+  border: 1px solid var(--sl-color-hairline);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: var(--sl-shadow-md);
+}

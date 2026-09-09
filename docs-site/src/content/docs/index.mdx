@@ -1,0 +1,146 @@
+---
+title: Sinsajo — Real-Time Local Voice Transcription
+description: Self-hosted, 100% offline speech-to-text. Flutter client + Rust server with Voice Activity Detection and Canary 180M / Parakeet 0.6B models.
+template: splash
+hero:
+  tagline: Self-hosted, 100% offline voice transcription. Real-time, low latency, complete privacy.
+  image:
+    file: ../../assets/sinsajo.svg
+  actions:
+    - text: Try Web App
+      link: /Sinsajo/app/
+      icon: right-arrow
+      variant: primary
+    - text: Download APK
+      link: https://github.com/lutgaru/Sinsajo/releases/latest
+      icon: down-caret
+      variant: secondary
+    - text: Quick Start
+      link: /Sinsajo/guides/quickstart/
+      icon: rocket
+      variant: minimal
+    - text: View on GitHub
+      link: https://github.com/lutgaru/Sinsajo
+      icon: github
+      variant: minimal
+---
+
+import { Card, CardGrid, LinkCard, Steps, Tabs, TabItem, Badge, Aside } from '@astrojs/starlight/components';
+
+<Aside type="tip" title="No cloud. No tracking.">
+  Everything runs locally. Models are downloaded from HuggingFace once and then run 100% offline via ONNX Runtime.
+</Aside>
+
+## Why Sinsajo?
+
+<CardGrid stagger>
+  <Card title="Real-time" icon="rocket">
+    ~150–300ms end-to-end latency. See text as you speak, with Voice Activity Detection (Silero VAD v5) sending only speech segments.
+  </Card>
+  <Card title="100% Private" icon="approve-check-circle">
+    Self-hosted Rust server. No API keys, no cloud. Your audio never leaves your network. Optional local WAV/OGG recording.
+  </Card>
+  <Card title="Multi-platform" icon="laptop">
+    Flutter client for Android, iOS, Desktop and **Web**. Rust server runs anywhere — Docker, bare metal, VPS.
+  </Card>
+  <Card title="Spanish First" icon="translate">
+    Native Spanish punctuation and multi-language target selection (en/es/fr/de/pt). English via Parakeet, translation via Canary.
+  </Card>
+</CardGrid>
+
+## How it works
+
+```
+┌─────────────────┐         WebSocket          ┌──────────────────┐
+│  Flutter Client │ ◄─────────────────────────►│   Rust Server    │
+│  (Dart/Silero)  │    PCM 16-bit / JSON       │ (transcribe-rs)  │
+└─────────────────┘                            └──────────────────┘
+       │                                                 │
+       │ Silero VAD v5                                   │ ONNX Model
+       │ (ONNX Runtime)                                  │
+       ▼                                                 ▼
+ ┌─────────────────┐                             ┌──────────────────┐
+ │  AudioService   │                             │  Canary 180M     │
+ │  + vad package  │                             │  Flash /         │
+ │  (ML-based)     │                             │  Parakeet TDT    │
+ └─────────────────┘                             └──────────────────┘
+```
+
+<Steps>
+
+1. **Capture** — Flutter records PCM 16-bit @ 16kHz
+2. **Detect** — Silero VAD v5 detects speech (ONNX Runtime)
+3. **Transmit** — Only speech chunks sent over WebSocket
+4. **Transcribe** — Rust server runs Canary 180M Flash or Parakeet TDT 0.6B (Int8)
+5. **Display** — Real-time text + optional server-side WAV/OGG recording
+
+</Steps>
+
+## Get started in 3 minutes
+
+<Tabs>
+  <TabItem label="Docker (recommended)">
+    ```bash
+    docker pull lutgaru/sinsajo-server:latest
+    docker run -p 8765:8765 \
+      -v sinsajo_models:/app/models \
+      -v sinsajo_records:/app/records \
+      lutgaru/sinsajo-server:latest
+    # Server on ws://localhost:8765
+    ```
+    Or with Compose — see [Server Guide](/Sinsajo/guides/server/).
+  </TabItem>
+  <TabItem label="Cargo">
+    ```bash
+    git clone https://github.com/lutgaru/Sinsajo.git
+    cd Sinsajo/server
+    cargo run --release -- --model ParakeetTDT --autodownload-model
+    ```
+  </TabItem>
+  <TabItem label="Flutter Client">
+    ```bash
+    cd sinsajo_client
+    flutter pub get
+    # update lib/providers/transcription_provider.dart -> kWsUrl
+    flutter run
+    ```
+    Or open the [Web App](/Sinsajo/app/) directly in your browser.
+  </TabItem>
+</Tabs>
+
+## Choose your way to use Sinsajo
+
+<CardGrid>
+  <LinkCard title="Web App" description="Use directly in the browser. No install. Requires HTTPS + your server IP." href="/Sinsajo/app/" />
+  <LinkCard title="Android APK" description="Download from GitHub Releases. Side-load, share via link or QR." href="https://github.com/lutgaru/Sinsajo/releases/latest" />
+  <LinkCard title="Self-host Server" description="One Docker command. Auto-downloads models (~2-3GB) on first run." href="/Sinsajo/guides/server/" />
+  <LinkCard title="Read the Docs" description="Architecture, protocol, configuration and troubleshooting." href="/Sinsajo/guides/quickstart/" />
+</CardGrid>
+
+## At a glance
+
+| Metric | Value |
+|--------|-------|
+| Latency | ~150–300ms chunk → text |
+| CPU | ~20–40% (1 core) |
+| RAM | ~500MB (Int8 quantized) |
+| Accuracy | ~95% clean Spanish |
+| Bandwidth | ~256KB/s (PCM, VAD reduces ~60%) |
+
+<Aside title="APK Distribution">
+  APKs are **not** stored in `git`. Every tagged release `client/v*` builds the APK via GitHub Actions and attaches it to the GitHub Release. Link directly to `https://github.com/lutgaru/Sinsajo/releases/latest/download/app-release.apk` from your landing buttons or share a QR.
+</Aside>
+
+## Next steps
+
+<CardGrid>
+  <Card title="Configure target language" icon="translate">
+    Pick output language in-app. Canary translates, Parakeet is English-only. Server advertises supported languages via `model_info`.
+  </Card>
+  <Card title="Save recordings" icon="document">
+    Enable `save_audio` in Settings — server saves WAV/OGG per session to `records/` for export.
+  </Card>
+  <Card title="Tune VAD" icon="setting">
+    Adjust thresholds in `audio_service.dart` for quiet rooms or noisy environments.
+  </Card>
+</CardGrid>
