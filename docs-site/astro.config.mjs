@@ -16,13 +16,14 @@ export default defineConfig({
 			},
 			favicon: '/sinsajo.svg',
 			customCss: ['./src/styles/custom.css'],
+			pagefind: false,
+			components: {
+				Header: './src/components/Header.astro',
+			},
 			social: [
 				{ icon: 'github', label: 'GitHub', href: 'https://github.com/lutgaru/Sinsajo' },
-				{ icon: 'discord', label: 'Docker Hub', href: 'https://hub.docker.com/r/lutgaru/sinsajo-server' },
+				{ icon: 'seti:docker', label: 'Docker Hub', href: 'https://hub.docker.com/r/lutgaru/sinsajo-server' },
 			],
-			editLink: {
-				baseUrl: 'https://github.com/lutgaru/Sinsajo/edit/master/docs-site/',
-			},
 			head: [
 				{ tag: 'meta', attrs: { property: 'og:image', content: 'https://lutgaru.github.io/Sinsajo/sinsajo.svg' } },
 			],
