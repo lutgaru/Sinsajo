@@ -1,0 +1,161 @@
+---
+title: Quick Start
+description: "Run Sinsajo in minutes — you always need a server and a client."
+---
+
+import { Tabs, TabItem, Aside, Card, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
+
+<Aside type="caution" title="Two parts required">
+  Sinsajo always needs **two sides**: a **Server** (Rust, runs the AI) and a **Client** (Flutter, captures audio + shows text). They connect over WebSocket `ws://YOUR_SERVER_IP:8765`. Run one server, connect any client to it.
+</Aside>
+
+## Prerequisites
+
+| Side | Requirement |
+|------|-------------|
+| **Server** — pick one path | Docker **or** Rust 1.70+ **or** precompiled `x86_64` binary (Windows/Linux) |
+| **Client** — pick one path | Modern browser (Web App) **or** Android device **or** Flutter 3.x |
+
+No cloud account needed. First server start downloads the model (~2–3GB), subsequent starts are ~2–3s.
+
+## 0. Clone (only if you build from source)
+
+```bash
+git clone https://github.com/lutgaru/Sinsajo.git
+cd Sinsajo
+```
+
+Skip this if you only use Docker or precompiled binaries / Web App / APK.
+
+## 1. Start a Server — pick one
+
+<Tabs>
+  <TabItem label="Docker Compose (recommended)">
+    Best for a Linux server / homelab. Persists models and recordings.
+
+    ```yaml
+    # docker-compose.yml
+    services:
+      sinsajo-server:
+        image: lutgaru/sinsajo-server:latest
+        ports: ["8765:8765"]
+        volumes:
+          - sinsajo_models:/app/models
+          - sinsajo_records:/app/records
+        restart: unless-stopped
+    volumes:
+      sinsajo_models:
+      sinsajo_records:
+    ```
+
+    ```bash
+    docker compose up -d
+    # -> ws://localhost:8765 (or your LAN IP:8765)
+    ```
+
+    See [Server Guide](/Sinsajo/guides/server/) for tags (`--model Canary180M`) and volumes.
+  </TabItem>
+  <TabItem label="Docker CLI">
+    Same image without a compose file:
+
+    ```bash
+    docker pull lutgaru/sinsajo-server:latest
+    docker run -p 8765:8765 \
+      -v sinsajo_models:/app/models \
+      -v sinsajo_records:/app/records \
+      lutgaru/sinsajo-server:latest
+    ```
+  </TabItem>
+  <TabItem label="Precompiled binary">
+    No Docker / no Rust needed. Download for your OS/arch.
+
+    ```bash
+    # From GitHub Releases -> server/v* assets:
+    # - sinsajo-server        (linux x86_64)
+    # - sinsajo-server.exe    (windows x86_64)
+    ./sinsajo-server --model ParakeetTDT --autodownload-model --port 8765
+    # Windows: .\sinsajo-server.exe --model ParakeetTDT --autodownload-model
+    ```
+
+    Get it at [Releases](https://github.com/lutgaru/Sinsajo/releases). No compilation.
+
+    CLI args:
+
+    | Arg | Default | Description |
+    |-----|---------|-------------|
+    | `--model` | prompt | `ParakeetTDT` or `Canary180M` |
+    | `--autodownload-model` | `false` | Auto-download if missing |
+    | `--port` | `8765` | WebSocket port |
+    | `--model-dir` | `./models` | Model storage |
+    | `--records-dir` | `./records` | WAV/OGG output |
+  </TabItem>
+  <TabItem label="Build from source">
+    For **any architecture** that meets minimum requirements (Rust 1.70+, ~500MB RAM for Int8).
+
+    ```bash
+    cd server
+    cargo run --release -- --model ParakeetTDT --autodownload-model
+    # -> ws://0.0.0.0:8765
+    # or build: cargo build --release && ./target/release/sinsajo-server --help
+    ```
+
+    If `--model` is omitted it reads `sinsajo-config.json`, then prompts.
+  </TabItem>
+</Tabs>
+
+<Aside type="tip" title="Model download">
+  Server auto-downloads on first run (~2–3GB from HuggingFace). Override dirs with `--model-dir` / `--records-dir`. Use `Canary180M` for smaller/faster multilingual, `ParakeetTDT` for English accuracy.
+</Aside>
+
+## 2. Connect a Client — pick one
+
+<Tabs>
+  <TabItem label="Web App (no install)">
+    Fastest — nothing to install.
+
+    1. Ensure your **server** is running (`ws://YOUR_SERVER_IP:8765` reachable)
+    2. Open [**Web App**](/Sinsajo/app/) (or `https://lutgaru.github.io/Sinsajo/app/`)
+    3. **Settings** → set server IP → tap **mic** → speak
+
+    Requires HTTPS for microphone (GitHub Pages provides it). See [Client Guide](/Sinsajo/guides/client/).
+  </TabItem>
+  <TabItem label="Android APK">
+    For phones/tablets — share via link or QR.
+
+    - Download `app-release.apk` from [Releases · latest](https://github.com/lutgaru/Sinsajo/releases/latest)
+    - Enable *Install unknown apps* → install → set server IP in Settings → speak
+
+    Built on every `client/v*` tag via GitHub Actions. Do not commit APKs to git.
+  </TabItem>
+  <TabItem label="Build Flutter app">
+    For **any platform** meeting client requirements (Flutter 3.x): Android, iOS, Linux, macOS, Windows, Web.
+
+    ```bash
+    cd sinsajo_client
+    flutter pub get
+    flutter run                                # on connected device/emulator
+    flutter build apk --release                # Android
+    flutter build web --release --base-href /Sinsajo/app/  # Web (merged into docs-site/dist/app/)
+    ```
+
+    Default URL is `lib/providers/transcription_provider.dart` → `kWsUrl`, overridden in Settings UI (gain, source, `save_audio`, `target_language`).
+  </TabItem>
+</Tabs>
+
+## 3. Use it
+
+<Steps>
+
+1. Tap the microphone button in the client
+2. Speak — VAD highlights when speech is detected (only speech is sent)
+3. See real-time text; `model_info` tells you which languages are supported
+4. Tap **Stop** or **Clean** to end — `clean` also saves WAV/OGG on the server `records/`
+5. **Copy** or **clear** the transcription
+
+</Steps>
+
+<Aside title="60-second test">
+  `docker compose up -d` → server on `localhost:8765` → open Web App → set `localhost` or LAN IP → tap mic.
+</Aside>
+
+See also: [Architecture](/Sinsajo/guides/architecture/), [Configuration](/Sinsajo/guides/configuration/), [Client](/Sinsajo/guides/client/), [Server](/Sinsajo/guides/server/).

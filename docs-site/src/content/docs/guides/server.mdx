@@ -1,0 +1,132 @@
+---
+title: Server (Rust)
+description: "Rust server — choose Docker, precompiled binary or build from source."
+---
+
+import { Tabs, TabItem, Aside, Card, CardGrid } from '@astrojs/starlight/components';
+
+<Aside type="tip" title="Runs alone, used by the client">
+  The server does transcription and exposes `ws://0.0.0.0:8765` (configurable). It is useless without a **Client** — connect via [Web App](/Sinsajo/app/), APK or a Flutter build. See [Client Guide](/Sinsajo/guides/client/) and [Quick Start](/Sinsajo/guides/quickstart/).
+</Aside>
+
+## Options — pick one
+
+<Tabs>
+  <TabItem label="Docker Compose (recommended)">
+    Best for a Linux server, homelab or VPS. Image `lutgaru/sinsajo-server` from Docker Hub, models/records persisted.
+
+    ```yaml
+    # docker-compose.yml
+    services:
+      sinsajo-server:
+        image: lutgaru/sinsajo-server:latest
+        ports: ["8765:8765"]
+        volumes:
+          - sinsajo_models:/app/models
+          - sinsajo_records:/app/records
+        restart: unless-stopped
+    volumes:
+      sinsajo_models:
+      sinsajo_records:
+    ```
+
+    ```bash
+    docker compose up -d
+    ```
+
+    Or pin a tag: `lutgaru/sinsajo-server:latest` or `server/v*` tag. Pass args after image: `... lutgaru/sinsajo-server:latest --model Canary180M --autodownload-model`.
+  </TabItem>
+  <TabItem label="Docker CLI">
+    Same image, single command without compose file:
+
+    ```bash
+    docker pull lutgaru/sinsajo-server:latest
+    docker run -p 8765:8765 \
+      -v sinsajo_models:/app/models \
+      -v sinsajo_records:/app/records \
+      lutgaru/sinsajo-server:latest --model ParakeetTDT --autodownload-model
+    ```
+  </TabItem>
+  <TabItem label="Precompiled binary">
+    No Docker, no Rust needed — download and run.
+
+    ```bash
+    # From GitHub Releases -> server/v* assets:
+    # - sinsajo-server        (linux x86_64)
+    # - sinsajo-server.exe    (windows x86_64)
+    ./sinsajo-server --model ParakeetTDT --autodownload-model --port 8765
+    # Windows PowerShell: .\sinsajo-server.exe --model ParakeetTDT --autodownload-model
+    # Custom dirs: --model-dir ./models --records-dir ./records
+    ```
+
+    Get it at [Releases](https://github.com/lutgaru/Sinsajo/releases). No compilation for `x86_64` Windows/Linux.
+
+    CLI args:
+
+    | Arg | Default | Description |
+    |-----|---------|-------------|
+    | `--model` | prompt | `ParakeetTDT` or `Canary180M` |
+    | `--autodownload-model` | `false` | Auto-download if missing |
+    | `--port` | `8765` | WebSocket port |
+    | `--model-dir` | `./models` | Model storage |
+    | `--records-dir` | `./records` | WAV/OGG output |
+  </TabItem>
+  <TabItem label="Build from source">
+    For **any architecture** meeting minimum requirements (Rust 1.70+, ~500MB RAM for Int8, ~2–3GB disk for model).
+
+    ```bash
+    git clone https://github.com/lutgaru/Sinsajo.git
+    cd Sinsajo/server
+    cargo run --release -- --model ParakeetTDT --autodownload-model
+    # or
+    cargo build --release && ./target/release/sinsajo-server --help
+    ```
+
+    Add new models in `src/config.rs` (`MODELS` array) with HuggingFace repo + folder. If `--model` is omitted it reads `sinsajo-config.json`, then prompts.
+
+    Available: `ParakeetTDT` (0.6B, more accurate, English) and `Canary180M` (180M, faster, multilingual).
+  </TabItem>
+</Tabs>
+
+## Models
+
+Auto-download handles ~2–3GB on first run. Subsequent starts ~2–3s. Override dirs with `--model-dir` / `--records-dir`.
+
+Current models: `ParakeetTDT` (TDT 0.6B, English) and `Canary180M` (Canary 180M Flash, multilingual). Edit `server/src/config.rs` to add more.
+
+## GPU acceleration
+
+```rust
+use transcribe_rs::{set_ort_accelerator, OrtAccelerator};
+set_ort_accelerator(OrtAccelerator::Cuda); // or Auto
+```
+
+## Translation
+
+Canary supports `target_language` from client `start` message. Server forwards to `transcribe_with`:
+
+```rust
+model.transcribe_with(&samples, &CanaryParams {
+  language: Some("es".to_string()),
+  target_language: Some("en".to_string()),
+  ..Default::default()
+})?;
+```
+
+Parakeet is English-only and ignores the target language. See [Protocol](/Sinsajo/guides/protocol/).
+
+## Persistence
+
+- Models: `models/` (or `--model-dir`)
+- Recordings: `records/` (WAV/OGG, triggered by client `clean`)
+- Config: `sinsajo-config.json` (persists last chosen model)
+
+## Deployment
+
+The server is **not** deployed to GitHub Pages (static). Run it on your LAN, VPS, fly.io / Railway, etc. with Docker or a binary. Expose `8765` and point clients to `ws://YOUR_IP:8765` or `wss://` behind a reverse proxy (Caddy/Nginx). For remote access consider Tailscale/WireGuard.
+
+<CardGrid>
+  <Card title="x86_64 Windows/Linux" icon="laptop">Precompiled binary — fastest without Docker.</Card>
+  <Card title="Other arch" icon="setting">Cargo build — any arch/OS meeting Rust minimums.</Card>
+  <Card title="Linux server" icon="approve-check">Docker Compose / CLI — recommended for homelab.</Card>
+</CardGrid>

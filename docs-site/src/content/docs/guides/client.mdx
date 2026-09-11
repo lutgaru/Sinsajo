@@ -1,0 +1,118 @@
+---
+title: Client (Flutter)
+description: "Flutter client — choose Web App, APK or build from source."
+---
+
+import { Tabs, TabItem, Aside, Card, CardGrid } from '@astrojs/starlight/components';
+
+<Aside type="caution" title="Needs a running Server">
+  The client does **no** transcription alone. You must point it to a running **Server** (`ws://YOUR_SERVER_IP:8765`). Start one first — see [Server Guide](/Sinsajo/guides/server/) or [Quick Start](/Sinsajo/guides/quickstart/).
+</Aside>
+
+## Options — pick one
+
+<Tabs>
+  <TabItem label="Web App (no install)">
+    Nothing to install — runs in any modern browser (desktop or mobile).
+
+    1. Start your **server** (Docker / binary / cargo)
+    2. Open [**Web App**](/Sinsajo/app/) — `https://lutgaru.github.io/Sinsajo/app/`
+    3. **Settings** → set **Server IP** (e.g. `192.168.1.100:8765`) → tap mic → speak
+
+    :::caution[Microphone on Web]
+    Browsers require **HTTPS** for `getUserMedia`. GitHub Pages provides it. If you self-host the Web App elsewhere, ensure TLS. `onnxruntime-web` WASM needs correct MIME and COOP/COEP headers if you customize hosting.
+    :::
+
+    The Web App on GitHub Pages is built from `sinsajo_client` via:
+
+    ```bash
+    flutter build web --release --base-href /Sinsajo/app/
+    ```
+
+    In CI it is merged into `docs-site/dist/app/` for a single Pages deploy. Preview locally:
+
+    ```bash
+    cd docs-site && npm run build
+    # PowerShell: Copy-Item -Recurse -Force ../sinsajo_client/build/web/* dist/app/
+    # Bash: cp -r ../sinsajo_client/build/web/* dist/app/
+    ```
+  </TabItem>
+  <TabItem label="Android APK">
+    For Android phones/tablets — distribute via link or QR without recompiling.
+
+    **Install:**
+    - Download `app-release.apk` from [Releases · latest](https://github.com/lutgaru/Sinsajo/releases/latest)
+    - Enable *Install unknown apps* on Android → install → open → Settings → set server IP
+
+    **Build yourself (optional):**
+    ```bash
+    cd sinsajo_client
+    flutter pub get
+    flutter build apk --release
+    # output: build/app/outputs/flutter-apk/app-release.apk
+    ```
+
+    Built automatically on every `client/v*` tag via GitHub Actions. Do not commit APKs to git — link to the Release or generate a QR.
+
+    Minimum: Android device meeting Flutter 3.x requirements.
+  </TabItem>
+  <TabItem label="Build from source">
+    For **any platform** meeting client requirements (Flutter 3.x): Android, iOS, Linux, macOS, Windows, Web.
+
+    ```bash
+    git clone https://github.com/lutgaru/Sinsajo.git
+    cd Sinsajo/sinsajo_client
+    flutter pub get
+    flutter run                  # runs on connected device/emulator/desktop
+    # or target a platform:
+    flutter build apk --release
+    flutter build ios --release
+    flutter build linux --release
+    flutter build web --release --base-href /Sinsajo/app/
+    ```
+
+    Configure the default server URL in code (overridden in Settings UI):
+
+    ```dart
+    // lib/providers/transcription_provider.dart
+    const String kWsUrl = 'ws://192.168.1.100:8765';
+    ```
+
+    Other in-app Settings: microphone gain, audio source, `save_audio` + format `wav/ogg`, `target_language` (enabled per `model_info.languages` from server).
+  </TabItem>
+</Tabs>
+
+## Voice Activity Detection
+
+In `lib/services/audio_service.dart`:
+
+```dart
+await _vadHandler.startListening(
+  model: 'v5',
+  frameSamples: 512,
+  positiveSpeechThreshold: 0.5,
+  negativeSpeechThreshold: 0.35,
+  redemptionFrames: 8,
+  preSpeechPadFrames: 1,
+  minSpeechFrames: 3,
+);
+```
+
+**Tuning:**
+
+- Lower `positiveSpeechThreshold` to `0.3` for quiet voices
+- Lower `negativeSpeechThreshold` to `0.2` to keep segments longer
+- Increase `redemptionFrames` to `12` to avoid cutting pauses
+- Package: [`vad` (pub.dev)](https://pub.dev/packages/vad) — Silero VAD v5 via ONNX Runtime
+
+## State & Protocol
+
+Riverpod 2.x manages WebSocket lifecycle and transcription state. Check `transcription_provider.dart` for `transcription`, `partial`, `final` and `model_info` handlers. See [Protocol](/Sinsajo/guides/protocol/) for the full WebSocket spec.
+
+## Choosing quickly
+
+<CardGrid>
+  <Card title="Web App" icon="laptop">Fastest to try or share — no install, just a URL. Needs server IP reachable via ws/wss.</Card>
+  <Card title="APK" icon="android">Best for testers on Android — one file, no store. Share Release link/QR.</Card>
+  <Card title="From source" icon="setting">For developers or other platforms (iOS/Desktop/Web) — compile with Flutter on any supported OS/arch.</Card>
+</CardGrid>

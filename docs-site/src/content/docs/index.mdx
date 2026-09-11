@@ -3,7 +3,7 @@ title: Sinsajo — Real-Time Local Voice Transcription
 description: Self-hosted, 100% offline speech-to-text. Flutter client + Rust server with Voice Activity Detection and Canary 180M / Parakeet 0.6B models.
 template: splash
 hero:
-  tagline: Self-hosted, 100% offline voice transcription. Real-time, low latency, complete privacy.
+  tagline: Self-hosted, Open Source, 100% offline voice transcription. Real-time, low latency, complete privacy.
   image:
     file: ../../assets/sinsajo.svg
   actions:
@@ -43,8 +43,8 @@ import { Card, CardGrid, LinkCard, Steps, Tabs, TabItem, Badge, Aside } from '@a
   <Card title="Multi-platform" icon="laptop">
     Flutter client for Android, iOS, Desktop and **Web**. Rust server runs anywhere — Docker, bare metal, VPS.
   </Card>
-  <Card title="Spanish First" icon="translate">
-    Native Spanish punctuation and multi-language target selection (en/es/fr/de/pt). English via Parakeet, translation via Canary.
+  <Card title="Multi language" icon="translate">
+    Multi-language target selection (en/es/fr/de/pt). English via Parakeet, translation via Canary.
   </Card>
 </CardGrid>
 
@@ -76,45 +76,123 @@ import { Card, CardGrid, LinkCard, Steps, Tabs, TabItem, Badge, Aside } from '@a
 
 </Steps>
 
-## Get started in 3 minutes
+## Sinsajo needs two parts to work
+
+<Aside type="caution" title="Client + Server required">
+  Sinsajo is **not** standalone. You always need a **Server** (Rust — runs the AI model) and a **Client** (Flutter — captures audio and shows text). They talk over WebSocket `ws://YOUR_SERVER_IP:8765`. Run one server, connect any clients to it.
+</Aside>
+
+### 1. Start a Server — pick one
 
 <Tabs>
-  <TabItem label="Docker (recommended)">
+  <TabItem label="Docker Compose (recommended)">
+    Best for a Linux server or homelab. Models and recordings are persisted in volumes.
+
+    ```yaml
+    # docker-compose.yml
+    services:
+      sinsajo-server:
+        image: lutgaru/sinsajo-server:latest
+        ports: ["8765:8765"]
+        volumes:
+          - sinsajo_models:/app/models
+          - sinsajo_records:/app/records
+        restart: unless-stopped
+    volumes:
+      sinsajo_models:
+      sinsajo_records:
+    ```
+    ```bash
+    docker compose up -d
+    # -> ws://localhost:8765 (auto-downloads ~2-3GB model on first run)
+    ```
+  </TabItem>
+  <TabItem label="Docker CLI">
+    Same image, single command — no compose file needed.
+
     ```bash
     docker pull lutgaru/sinsajo-server:latest
     docker run -p 8765:8765 \
       -v sinsajo_models:/app/models \
       -v sinsajo_records:/app/records \
       lutgaru/sinsajo-server:latest
-    # Server on ws://localhost:8765
     ```
-    Or with Compose — see [Server Guide](/Sinsajo/guides/server/).
   </TabItem>
-  <TabItem label="Cargo">
+  <TabItem label="Precompiled binary">
+    No Docker needed. Download the binary for your platform and run it.
+
+    ```bash
+    # GitHub Releases -> server/v* assets
+    # - sinsajo-server          (linux x86_64)
+    # - sinsajo-server.exe      (windows x86_64)
+    ./sinsajo-server --model ParakeetTDT --autodownload-model --port 8765
+    # or on Windows: .\sinsajo-server.exe --model ParakeetTDT --autodownload-model
+    ```
+    Grab it from [Releases](https://github.com/lutgaru/Sinsajo/releases) — no compile, just run.
+  </TabItem>
+  <TabItem label="Build from source">
+    For any architecture that meets the minimum requirements (Rust 1.70+, ~500MB RAM per Int8 model).
+
     ```bash
     git clone https://github.com/lutgaru/Sinsajo.git
     cd Sinsajo/server
     cargo run --release -- --model ParakeetTDT --autodownload-model
+    # or: cargo build --release && ./target/release/sinsajo-server --help
     ```
-  </TabItem>
-  <TabItem label="Flutter Client">
-    ```bash
-    cd sinsajo_client
-    flutter pub get
-    # update lib/providers/transcription_provider.dart -> kWsUrl
-    flutter run
-    ```
-    Or open the [Web App](/Sinsajo/app/) directly in your browser.
+    See [Server Guide](/Sinsajo/guides/server/) for CLI flags and GPU acceleration.
   </TabItem>
 </Tabs>
+
+### 2. Connect a Client — pick one
+
+<Tabs>
+  <TabItem label="Web App (no install)">
+    Fastest way to try it — nothing to install.
+
+    1. Make sure your **server** is running and reachable (`ws://YOUR_SERVER_IP:8765`)
+    2. Open the **Web App** → [Try Web App](/Sinsajo/app/)
+    3. In **Settings** set the server IP, tap the mic and speak
+
+    Requires HTTPS for microphone access (GitHub Pages provides it).
+  </TabItem>
+  <TabItem label="Android APK">
+    For Android phones/tablets. Share via link or QR.
+
+    - Download `app-release.apk` from [Releases · latest](https://github.com/lutgaru/Sinsajo/releases/latest)
+    - Enable *Install unknown apps* → install → set server IP in Settings → speak
+
+    APKs are built on every `client/v*` tag via GitHub Actions — not stored in git.
+  </TabItem>
+  <TabItem label="Build Flutter app">
+    For any platform that meets client requirements (Flutter 3.x). Compile for Android, iOS, Linux, macOS, Windows or Web.
+
+    ```bash
+    git clone https://github.com/lutgaru/Sinsajo.git
+    cd Sinsajo/sinsajo_client
+    flutter pub get
+    # optional: edit lib/providers/transcription_provider.dart -> kWsUrl
+    flutter run          # run on connected device
+    flutter build apk    # Android
+    flutter build web --base-href /Sinsajo/app/
+    ```
+    See [Client Guide](/Sinsajo/guides/client/).
+  </TabItem>
+</Tabs>
+
+<Aside title="Try it in 60 seconds">
+  1. `docker compose up -d` → server on `ws://localhost:8765`
+  2. Open [Web App](/Sinsajo/app/) → Settings → set `localhost` or your LAN IP → tap mic.
+</Aside>
 
 ## Choose your way to use Sinsajo
 
 <CardGrid>
-  <LinkCard title="Web App" description="Use directly in the browser. No install. Requires HTTPS + your server IP." href="/Sinsajo/app/" />
-  <LinkCard title="Android APK" description="Download from GitHub Releases. Side-load, share via link or QR." href="https://github.com/lutgaru/Sinsajo/releases/latest" />
-  <LinkCard title="Self-host Server" description="One Docker command. Auto-downloads models (~2-3GB) on first run." href="/Sinsajo/guides/server/" />
-  <LinkCard title="Read the Docs" description="Architecture, protocol, configuration and troubleshooting." href="/Sinsajo/guides/quickstart/" />
+  <LinkCard title="Server → Docker" description="Linux server with Docker Compose or docker run. Recommended for homelab/VPS. Auto-downloads model." href="/Sinsajo/guides/server/" />
+  <LinkCard title="Server → Binary" description="Precompiled x86_64 binaries for Windows & Linux. Download from Releases and run — no Docker, no Rust needed." href="https://github.com/lutgaru/Sinsajo/releases" />
+  <LinkCard title="Server → From source" description="Clone and cargo run --release. For any architecture meeting minimum requirements." href="/Sinsajo/guides/server/" />
+  <LinkCard title="Client → Web App" description="No install. Open in browser, set server IP and speak. Works on desktop & mobile browsers." href="/Sinsajo/app/" />
+  <LinkCard title="Client → Android APK" description="Side-load on Android. Download from Releases or share QR with testers." href="https://github.com/lutgaru/Sinsajo/releases/latest" />
+  <LinkCard title="Client → From source" description="Flutter codebase — compile for Android, iOS, Desktop or Web on any supported platform." href="/Sinsajo/guides/client/" />
 </CardGrid>
 
 ## At a glance
