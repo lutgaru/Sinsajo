@@ -18,6 +18,137 @@
   border-color: #ff8000;
 }
 
+/* "powered by WebSocket" — borderless transmission-line subtitle, integrated with hero */
+.powered-ws {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.7rem;
+  margin: 0.35rem 0 0;
+  padding: 0 0.1rem 0.65rem;
+  font-size: var(--sl-text-4xl);
+  font-style: italic;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+  color: var(--sl-color-gray-2);
+  transform: skewX(-6deg);
+}
+
+.powered-ws .ws-text strong {
+  font-style: italic;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  background: linear-gradient(90deg, #ffb14d, #ff8000 55%, #ff5e00);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* endpoint shapes: hollow client node -> solid live server node */
+.powered-ws .ws-node {
+  inline-size: 0.75rem;
+  block-size: 0.75rem;
+  flex: none;
+  border-radius: 50%;
+}
+
+.powered-ws .ws-node-start {
+  border: 2px solid var(--sl-color-accent);
+  background: transparent;
+  box-shadow: 0 0 0.45rem rgba(255, 128, 0, 0.55);
+  /* animation: ws-node-send 0.4 s ease-in-out infinite; */
+}
+
+.powered-ws .ws-node-end {
+  background: #4ade80;
+  box-shadow: 0 0 0.55rem rgba(74, 222, 128, 0.8);
+  /* animation: ws-node-receive 0.4s ease-in-out infinite; */
+}
+
+/* faint wire under the phrase */
+.powered-ws::after {
+  content: '';
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  block-size: 2px;
+  border-radius: 999rem;
+  background: linear-gradient(90deg, rgba(255, 128, 0, 0.65), rgba(255, 128, 0, 0.12));
+  -webkit-mask-image: linear-gradient(90deg, transparent, black 12%, black 88%, transparent);
+  mask-image: linear-gradient(90deg, transparent, black 12%, black 88%, transparent);
+}
+
+/* data packet racing start -> end along the wire */
+.powered-ws .ws-packet {
+  position: absolute;
+  bottom: -2.5px;
+  left: 0;
+  inline-size: 5px;
+  block-size: 5px;
+  border-radius: 50%;
+  background: #ffd9a8;
+  box-shadow:
+    0 0 0.5rem 2px rgba(255, 128, 0, 0.9),
+    -12px 0 6px rgba(255, 128, 0, 0.55),
+    -24px 0 4px rgba(255, 128, 0, 0.25);
+  animation: ws-travel 0.4s linear infinite;
+}
+
+@keyframes ws-travel {
+  0% {
+    left: 0;
+    opacity: 0;
+  }
+  8% {
+    opacity: 1;
+  }
+  88% {
+    opacity: 1;
+  }
+  100% {
+    left: calc(100% - 10px);
+    opacity: 0;
+  }
+}
+
+@keyframes ws-node-send {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  8% {
+    transform: scale(1.5);
+  }
+  18% {
+    transform: scale(1);
+  }
+}
+
+@keyframes ws-node-receive {
+  0%,
+  82% {
+    transform: scale(1);
+  }
+  90% {
+    transform: scale(1.5);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .powered-ws .ws-node-start,
+  .powered-ws .ws-node-end,
+  .powered-ws .ws-packet {
+    animation: none;
+  }
+  .powered-ws .ws-packet {
+    display: none;
+  }
+}
+
 /* App preview iframe */
 .app-preview {
   border: 1px solid var(--sl-color-hairline);
