@@ -1,6 +1,6 @@
 ---
 import { Image } from 'astro:assets';
-import { LinkButton } from '@astrojs/starlight/components';
+import { Icon, LinkButton } from '@astrojs/starlight/components';
 import DraftContentNotice from '@astrojs/starlight/components/DraftContentNotice.astro';
 
 const { data } = Astro.locals.starlightRoute.entry;
@@ -30,6 +30,7 @@ if (image) {
 ---
 
 <div class="hero">
+	<div class="hero-main">
 	{
 		darkImage && (
 			<Image
@@ -68,24 +69,64 @@ if (image) {
 			)
 		}
 	</div>
+	</div>
+	<p class="hero-strip">
+		<Icon name="approve-check-circle" size="1.1rem" />
+		<span><strong>No cloud. No tracking.</strong> Everything runs locally. Models are downloaded from HuggingFace once and then run 100% offline via ONNX Runtime.</span>
+	</p>
 </div>
 
 <style>
 	@layer starlight.core {
 		.hero {
+			display: flex;
+			flex-direction: column;
+			gap: 1.5rem;
+			padding-bottom: 1rem;
+		}
+
+		.hero-main {
 			display: grid;
 			grid-template-columns: 100%;
 			align-items: center;
 			gap: 1rem;
-			padding-bottom: 1rem;
+			inline-size: 100%;
 		}
 
-		.hero > img,
-		.hero > .hero-html {
+		.hero-main > img,
+		.hero-main > .hero-html {
 			object-fit: contain;
 			width: min(70%, 20rem);
 			height: auto;
 			margin-inline: auto;
+		}
+
+		.hero-strip {
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			gap: 0.6rem;
+			inline-size: 100%;
+			margin: 0;
+			padding: 0.7rem 1rem;
+			font-size: var(--sl-text-sm);
+			line-height: var(--sl-line-height);
+			color: var(--sl-color-gray-2);
+			text-align: center;
+			text-wrap: balance;
+			background: color-mix(in srgb, var(--sl-color-gray-6) 55%, transparent);
+			border-block: 1px solid var(--sl-color-hairline);
+			border-radius: 0.75rem;
+		}
+
+		.hero-strip :global(svg) {
+			flex: none;
+			color: var(--sl-color-accent);
+		}
+
+		.hero-strip strong {
+			color: var(--sl-color-white);
+			font-weight: 700;
 		}
 
 		.stack {
@@ -124,13 +165,16 @@ if (image) {
 
 		@media (min-width: 50rem) {
 			.hero {
-				grid-template-columns: 7fr 4fr;
-				gap: 3%;
 				padding-block: clamp(2.5rem, calc(1rem + 10vmin), 10rem);
 			}
 
-			.hero > img,
-			.hero > .hero-html {
+			.hero-main {
+				grid-template-columns: 7fr 4fr;
+				gap: 3%;
+			}
+
+			.hero-main > img,
+			.hero-main > .hero-html {
 				order: 2;
 				width: min(100%, 25rem);
 			}
