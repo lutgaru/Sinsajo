@@ -118,3 +118,29 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release upload "${{ github.event.release.tag_name }}" "${{ matrix.binary }}" --clobber
+
+  # Rolling "latest server" release.
+  # GitHub only supports ONE /releases/latest redirect per repo, so a client
+  # release would hijack it. This job mirrors the binaries into a stable
+  # `server-latest` tag instead: /releases/tag/server-latest
+  update-server-latest:
+    if: github.event_name == 'release' && startsWith(github.event.release.tag_name || '', 'server/')
+    needs: binaries
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: Mirror binaries to server-latest rolling release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SOURCE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          mkdir -p /tmp/server-latest
+          gh release download "$SOURCE_TAG" -D /tmp/server-latest --clobber
+          ls -lh /tmp/server-latest
+          gh release delete server-latest --cleanup-tag -y || true
+          gh release create server-latest \
+            --title "Server Latest ($SOURCE_TAG)" \
+            --notes "Rolling release tracking the latest server build. Source: $SOURCE_TAG." \
+            --latest=false \
+            /tmp/server-latest/*

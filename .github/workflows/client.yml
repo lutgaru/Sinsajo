@@ -68,3 +68,28 @@ jobs:
   # Web is now deployed together with docs-site via docs.yml
   # (Flutter web is built and merged into Astro dist/app during Pages deploy)
   # No separate Pages job here to avoid race conditions.
+
+  # Rolling "latest client" release.
+  # GitHub only supports ONE /releases/latest redirect per repo, so a server
+  # release would hijack it. This job mirrors the APK into a stable
+  # `client-latest` tag instead: /releases/tag/client-latest
+  update-client-latest:
+    if: github.event_name == 'release' && startsWith(github.event.release.tag_name || '', 'client/')
+    needs: release-android
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: Mirror APK to client-latest rolling release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SOURCE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          mkdir -p /tmp/client-latest
+          gh release download "$SOURCE_TAG" -p "app-release.apk" -D /tmp/client-latest --clobber
+          gh release delete client-latest --cleanup-tag -y || true
+          gh release create client-latest \
+            --title "Client Latest ($SOURCE_TAG)" \
+            --notes "Rolling release tracking the latest client build. Source: $SOURCE_TAG." \
+            --latest=false \
+            /tmp/client-latest/app-release.apk
