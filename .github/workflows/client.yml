@@ -80,6 +80,8 @@ jobs:
       contents: write
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+
       - name: Mirror APK to client-latest rolling release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
