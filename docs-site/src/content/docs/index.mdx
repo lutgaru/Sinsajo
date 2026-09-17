@@ -12,7 +12,11 @@ hero:
       icon: right-arrow
       variant: primary
     - text: Download APK
-      link: https://github.com/lutgaru/Sinsajo/releases/latest
+      link: https://github.com/lutgaru/Sinsajo/releases/tag/client-latest
+      icon: down-caret
+      variant: secondary
+    - text: Download Server
+      link: https://github.com/lutgaru/Sinsajo/releases/tag/server-latest
       icon: down-caret
       variant: secondary
     - text: Quick Start
@@ -124,7 +128,7 @@ import { Card, CardGrid, LinkCard, Steps, Tabs, TabItem, Badge, Aside } from '@a
     ./sinsajo-server --model ParakeetTDT --autodownload-model --port 8765
     # or on Windows: .\sinsajo-server.exe --model ParakeetTDT --autodownload-model
     ```
-    Grab it from [Releases](https://github.com/lutgaru/Sinsajo/releases) — no compile, just run.
+    Grab it from [server-latest](https://github.com/lutgaru/Sinsajo/releases/tag/server-latest) — no compile, just run.
   </TabItem>
   <TabItem label="Build from source">
     For any architecture that meets the minimum requirements (Rust 1.70+, ~500MB RAM per Int8 model).
@@ -154,7 +158,7 @@ import { Card, CardGrid, LinkCard, Steps, Tabs, TabItem, Badge, Aside } from '@a
   <TabItem label="Android APK">
     For Android phones/tablets. Share via link or QR.
 
-    - Download `app-release.apk` from [Releases · latest](https://github.com/lutgaru/Sinsajo/releases/latest)
+    - Download `app-release.apk` from [client-latest](https://github.com/lutgaru/Sinsajo/releases/tag/client-latest)
     - Enable *Install unknown apps* → install → set server IP in Settings → speak
 
     APKs are built on every `client/v*` tag via GitHub Actions — not stored in git.
@@ -184,10 +188,10 @@ import { Card, CardGrid, LinkCard, Steps, Tabs, TabItem, Badge, Aside } from '@a
 
 <CardGrid>
   <LinkCard title="Server → Docker" description="Linux server with Docker Compose or docker run. Recommended for homelab/VPS. Auto-downloads model." href="/Sinsajo/guides/server/" />
-  <LinkCard title="Server → Binary" description="Precompiled x86_64 binaries for Windows & Linux. Download from Releases and run — no Docker, no Rust needed." href="https://github.com/lutgaru/Sinsajo/releases" />
+  <LinkCard title="Server → Binary" description="Precompiled x86_64 binaries for Windows & Linux. Download from server-latest and run — no Docker, no Rust needed." href="https://github.com/lutgaru/Sinsajo/releases/tag/server-latest" />
   <LinkCard title="Server → From source" description="Clone and cargo run --release. For any architecture meeting minimum requirements." href="/Sinsajo/guides/server/" />
   <LinkCard title="Client → Web App" description="No install. Open in browser, set server IP and speak. Works on desktop & mobile browsers." href="/Sinsajo/app/" />
-  <LinkCard title="Client → Android APK" description="Side-load on Android. Download from Releases or share QR with testers." href="https://github.com/lutgaru/Sinsajo/releases/latest" />
+  <LinkCard title="Client → Android APK" description="Side-load on Android. Download from client-latest or share QR with testers." href="https://github.com/lutgaru/Sinsajo/releases/tag/client-latest" />
   <LinkCard title="Client → From source" description="Flutter codebase — compile for Android, iOS, Desktop or Web on any supported platform." href="/Sinsajo/guides/client/" />
 </CardGrid>
 
@@ -202,7 +206,7 @@ import { Card, CardGrid, LinkCard, Steps, Tabs, TabItem, Badge, Aside } from '@a
 | Bandwidth | ~256KB/s (PCM, VAD reduces ~60%) |
 
 <Aside title="APK Distribution">
-  APKs are **not** stored in `git`. Every tagged release `client/v*` builds the APK via GitHub Actions and attaches it to the GitHub Release. Link directly to `https://github.com/lutgaru/Sinsajo/releases/latest/download/app-release.apk` from your landing buttons or share a QR.
+  APKs are **not** stored in `git`. Every tagged release `client/v*` builds the APK via GitHub Actions and attaches it to the GitHub Release. Link directly to `https://github.com/lutgaru/Sinsajo/releases/tag/client-latest/download/app-release.apk` from your landing buttons or share a QR.
 </Aside>
 
 ## Next steps
