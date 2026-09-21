@@ -1,21 +1,42 @@
-/* Sinsajo brand — warm orange accent */
-:root {
+/* Sinsajo brand — warm orange accent.
+   Dark mode uses Starlight stock white/black (untouched).
+   Light mode only gets soft warm paper + charcoal overrides below. */
+:root,
+:root[data-theme='dark'] {
   --sl-color-accent-low: #3d1f00;
   --sl-color-accent: #ff8000;
   --sl-color-accent-high: #ff9f3d;
-  --sl-color-white: #ffffff;
 }
 
 :root[data-theme='light'] {
   --sl-color-accent-low: #ffe0b3;
   --sl-color-accent: #d96a00;
   --sl-color-accent-high: #8a4200;
+  /* soften harsh pure-black text -> warm charcoal,
+     and pure-white bg -> warm paper */
+  --sl-color-white: #2e2a23;
+  --sl-color-black: #fffcf5;
+  --sl-color-gray-7: #fff6e8;
+  --sl-color-gray-6: #ece4d4;
+  /* warm body text hierarchy: headings (white) darkest,
+     body softer, muted softest — all warm, all pass contrast on paper bg */
+  --sl-color-gray-1: #2e2a23;
+  --sl-color-gray-2: #4f463c;
+  --sl-color-gray-3: #7a6f60;
+  --sl-color-text: #4f463c;
 }
 
-/* Hero CTA tweak */
+/* Hero CTA — keep brand orange in both themes, but force dark text.
+   Starlight's default primary swaps to white-on-dark-orange in light mode;
+   white text on bright #ff8000 fails contrast (~3:1), dark text passes (~7:1). */
 .hero .actions a[data-variant='primary'] {
   background: #ff8000;
   border-color: #ff8000;
+  color: #1c0e00;
+}
+
+.hero .actions a[data-variant='primary']:hover {
+  color: #1c0e00;
 }
 
 /* "powered by WebSocket" — borderless transmission-line subtitle, integrated with hero */
@@ -155,4 +176,35 @@
   border-radius: 12px;
   overflow: hidden;
   box-shadow: var(--sl-shadow-md);
+}
+
+/* Light-mode contrast fixes — dark mode above is untouched.
+   Bright oranges / light greens washed out on white backgrounds,
+   so use darker variants only under [data-theme='light']. */
+:root[data-theme='light'] .powered-ws .ws-text strong {
+  background: linear-gradient(90deg, #b45309, #c25e00 55%, #9a3412);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+:root[data-theme='light'] .powered-ws::after {
+  background: linear-gradient(90deg, rgba(194, 94, 0, 0.85), rgba(194, 94, 0, 0.25));
+}
+
+:root[data-theme='light'] .powered-ws .ws-node-start {
+  box-shadow: 0 0 0.45rem rgba(194, 94, 0, 0.5);
+}
+
+:root[data-theme='light'] .powered-ws .ws-node-end {
+  background: #15803d;
+  box-shadow: 0 0 0.55rem rgba(21, 128, 61, 0.5);
+}
+
+:root[data-theme='light'] .powered-ws .ws-packet {
+  background: #c25e00;
+  box-shadow:
+    0 0 0.5rem 2px rgba(194, 94, 0, 0.7),
+    -12px 0 6px rgba(194, 94, 0, 0.45),
+    -24px 0 4px rgba(194, 94, 0, 0.25);
 }
