@@ -32,7 +32,16 @@ class AudioService {
   Stream<AudioChunk> get chunks => _chunkController!.stream;
   Future<bool> get hasPermission async => await _recorder.hasPermission();
 
-  Future<void> start({AndroidAudioSource audioSource = AndroidAudioSource.camcorder}) async {
+  Future<void> start({
+    AndroidAudioSource audioSource = AndroidAudioSource.camcorder,
+    int frameSamples = 512,
+    double positiveSpeechThreshold = 0.45,
+    double negativeSpeechThreshold = 0.35,
+    int redemptionFrames = 7,
+    int preSpeechPadFrames = 8,
+    int minSpeechFrames = 8,
+    int endSpeechPadFrames = 3,
+  }) async {
     await _cleanup();
     _isStopping = false;
 
@@ -65,13 +74,13 @@ class AudioService {
     await _vadHandler!.startListening(
       audioStream: stream,
       model: 'v5',
-      frameSamples: 512,
-      positiveSpeechThreshold: 0.45,
-      negativeSpeechThreshold: 0.35,
-      redemptionFrames: 7,
-      preSpeechPadFrames: 8,
-      minSpeechFrames: 8,
-      endSpeechPadFrames: 3,
+      frameSamples: frameSamples,
+      positiveSpeechThreshold: positiveSpeechThreshold,
+      negativeSpeechThreshold: negativeSpeechThreshold,
+      redemptionFrames: redemptionFrames,
+      preSpeechPadFrames: preSpeechPadFrames,
+      minSpeechFrames: minSpeechFrames,
+      endSpeechPadFrames: endSpeechPadFrames,
     );
 
     debugPrint('[Audio] Recording started (Silero VAD v5)');
@@ -85,7 +94,16 @@ class AudioService {
     debugPrint('[Audio] Recording paused');
   }
 
-  Future<void> resume({AndroidAudioSource audioSource = AndroidAudioSource.camcorder}) async {
+  Future<void> resume({
+    AndroidAudioSource audioSource = AndroidAudioSource.camcorder,
+    int frameSamples = 512,
+    double positiveSpeechThreshold = 0.45,
+    double negativeSpeechThreshold = 0.35,
+    int redemptionFrames = 7,
+    int preSpeechPadFrames = 8,
+    int minSpeechFrames = 8,
+    int endSpeechPadFrames = 3,
+  }) async {
     _isStopping = false;
 
     if (_chunkController == null || _chunkController!.isClosed) {
@@ -119,13 +137,13 @@ class AudioService {
     await _vadHandler!.startListening(
       audioStream: stream,
       model: 'v5',
-      frameSamples: 512,
-      positiveSpeechThreshold: 0.45,
-      negativeSpeechThreshold: 0.35,
-      redemptionFrames: 7,
-      preSpeechPadFrames: 8,
-      minSpeechFrames: 8,
-      endSpeechPadFrames: 3,
+      frameSamples: frameSamples,
+      positiveSpeechThreshold: positiveSpeechThreshold,
+      negativeSpeechThreshold: negativeSpeechThreshold,
+      redemptionFrames: redemptionFrames,
+      preSpeechPadFrames: preSpeechPadFrames,
+      minSpeechFrames: minSpeechFrames,
+      endSpeechPadFrames: endSpeechPadFrames,
     );
 
     debugPrint('[Audio] Recording resumed');

@@ -166,7 +166,16 @@ class TranscriptionNotifier extends Notifier<TranscriptionState> {
     _sendStartWithSettings();
     final settings = ref.read(settingsProvider);
     _audio.gain = settings.micGain;
-    await _audio.start(audioSource: settings.audioSource);
+    await _audio.start(
+      audioSource: settings.audioSource,
+      frameSamples: settings.frameSamples,
+      positiveSpeechThreshold: settings.positiveSpeechThreshold,
+      negativeSpeechThreshold: settings.negativeSpeechThreshold,
+      redemptionFrames: settings.redemptionFrames,
+      preSpeechPadFrames: settings.preSpeechPadFrames,
+      minSpeechFrames: settings.minSpeechFrames,
+      endSpeechPadFrames: settings.endSpeechPadFrames,
+    );
 
     _audioSub = _audio.chunks.listen((chunk) {
       debugPrint('[Audio] → Enviando chunk: ${chunk.pcmBytes.length} bytes, isFinal=${chunk.isFinal}');
@@ -188,7 +197,16 @@ class TranscriptionNotifier extends Notifier<TranscriptionState> {
     if (!state.isPaused) return;
     final settings = ref.read(settingsProvider);
     _audio.gain = settings.micGain;
-    await _audio.resume(audioSource: settings.audioSource);
+    await _audio.resume(
+      audioSource: settings.audioSource,
+      frameSamples: settings.frameSamples,
+      positiveSpeechThreshold: settings.positiveSpeechThreshold,
+      negativeSpeechThreshold: settings.negativeSpeechThreshold,
+      redemptionFrames: settings.redemptionFrames,
+      preSpeechPadFrames: settings.preSpeechPadFrames,
+      minSpeechFrames: settings.minSpeechFrames,
+      endSpeechPadFrames: settings.endSpeechPadFrames,
+    );
     _audioSub = _audio.chunks.listen((chunk) {
       debugPrint('[Audio] → Enviando chunk: ${chunk.pcmBytes.length} bytes, isFinal=${chunk.isFinal}');
       _ws.sendAudioChunk(chunk.pcmBytes);

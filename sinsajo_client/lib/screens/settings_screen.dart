@@ -29,11 +29,12 @@ class SettingsScreen extends ConsumerWidget {
           ),
         ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+      body: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
             Text(
               'Microphone gain',
               style: Theme.of(context).textTheme.titleMedium,
@@ -243,8 +244,243 @@ class SettingsScreen extends ConsumerWidget {
                 ref.read(settingsProvider.notifier).setIpAddress(value);
               },
             ),
+            const SizedBox(height: 24),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Voice Activity Detection (VAD)',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ),
+                TextButton(
+                  onPressed: () {
+                    ref.read(settingsProvider.notifier).resetVadDefaults();
+                  },
+                  child: const Text('Reset defaults'),
+                ),
+              ],
+            ),
+            Text(
+              'Tuning how speech is detected. Lower thresholds react to quieter voices; higher frame counts make detection more stable. Changes apply to the next recording.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.outline,
+                  ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Frame samples',
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
+            const SizedBox(height: 4),
+            DropdownButtonFormField<int>(
+              initialValue: settings.frameSamples,
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              ),
+              items: kFrameSamplesOptions
+                  .map((v) => DropdownMenuItem(
+                        value: v,
+                        child: Text('$v (${(v / 16).toStringAsFixed(0)} ms)'),
+                      ))
+                  .toList(),
+              onChanged: (value) {
+                if (value != null) {
+                  ref.read(settingsProvider.notifier).setFrameSamples(value);
+                }
+              },
+            ),
+            _VadDoubleSlider(
+              label: 'Positive speech threshold',
+              subtitle: 'Probability to start speech',
+              value: settings.positiveSpeechThreshold,
+              onChanged: (v) => ref
+                  .read(settingsProvider.notifier)
+                  .setPositiveSpeechThreshold(v),
+            ),
+            _VadDoubleSlider(
+              label: 'Negative speech threshold',
+              subtitle: 'Probability to end speech',
+              value: settings.negativeSpeechThreshold,
+              onChanged: (v) => ref
+                  .read(settingsProvider.notifier)
+                  .setNegativeSpeechThreshold(v),
+            ),
+            _VadIntSlider(
+              label: 'Redemption frames',
+              subtitle: 'Silence frames needed to end an utterance',
+              value: settings.redemptionFrames,
+              min: 0,
+              max: 20,
+              onChanged: (v) => ref
+                  .read(settingsProvider.notifier)
+                  .setRedemptionFrames(v),
+            ),
+            _VadIntSlider(
+              label: 'Pre-speech pad frames',
+              subtitle: 'Frames of pre-roll kept before speech',
+              value: settings.preSpeechPadFrames,
+              min: 0,
+              max: 20,
+              onChanged: (v) => ref
+                  .read(settingsProvider.notifier)
+                  .setPreSpeechPadFrames(v),
+            ),
+            _VadIntSlider(
+              label: 'Min speech frames',
+              subtitle: 'Minimum speech frames to emit a segment',
+              value: settings.minSpeechFrames,
+              min: 1,
+              max: 20,
+              onChanged: (v) =>
+                  ref.read(settingsProvider.notifier).setMinSpeechFrames(v),
+            ),
+            _VadIntSlider(
+              label: 'End speech pad frames',
+              subtitle: 'Trailing frames kept after speech ends',
+              value: settings.endSpeechPadFrames,
+              min: 0,
+              max: 10,
+              onChanged: (v) => ref
+                  .read(settingsProvider.notifier)
+                  .setEndSpeechPadFrames(v),
+            ),
           ],
+          ),
         ),
+      ),
+    );
+  }
+}
+
+class _VadDoubleSlider extends StatelessWidget {
+  const _VadDoubleSlider({
+    required this.label,
+    required this.subtitle,
+    required this.value,
+    required this.onChanged,
+  });
+
+  final String label;
+  final String subtitle;
+  final double value;
+  final ValueChanged<double> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(label, style: Theme.of(context).textTheme.titleSmall),
+                    Text(
+                      subtitle,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: Theme.of(context).colorScheme.outline,
+                          ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  value.toStringAsFixed(2),
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+              ),
+            ],
+          ),
+          Slider(
+            value: value.clamp(0.0, 1.0),
+            min: 0.0,
+            max: 1.0,
+            divisions: 100,
+            label: value.toStringAsFixed(2),
+            onChanged: onChanged,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _VadIntSlider extends StatelessWidget {
+  const _VadIntSlider({
+    required this.label,
+    required this.subtitle,
+    required this.value,
+    required this.min,
+    required this.max,
+    required this.onChanged,
+  });
+
+  final String label;
+  final String subtitle;
+  final int value;
+  final int min;
+  final int max;
+  final ValueChanged<int> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(label, style: Theme.of(context).textTheme.titleSmall),
+                    Text(
+                      subtitle,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: Theme.of(context).colorScheme.outline,
+                          ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  '$value',
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+              ),
+            ],
+          ),
+          Slider(
+            value: value.clamp(min, max).toDouble(),
+            min: min.toDouble(),
+            max: max.toDouble(),
+            divisions: (max - min) == 0 ? 1 : (max - min),
+            label: '$value',
+            onChanged: (v) => onChanged(v.round()),
+          ),
+        ],
       ),
     );
   }
