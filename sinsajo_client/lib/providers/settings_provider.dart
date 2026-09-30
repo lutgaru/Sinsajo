@@ -42,6 +42,7 @@ class SettingsState {
   final bool saveAudio;
   final AudioSaveFormat audioFormat;
   final TargetLanguage targetLanguage;
+  final bool saveAudioLocal;
   // ── VAD (Silero v5) ─────────────────────────────
   final int frameSamples;
   final double positiveSpeechThreshold;
@@ -57,6 +58,7 @@ class SettingsState {
     this.saveAudio = true,
     this.audioFormat = AudioSaveFormat.wav,
     this.targetLanguage = TargetLanguage.english,
+    this.saveAudioLocal = false,
     this.frameSamples = kDefaultFrameSamples,
     this.positiveSpeechThreshold = kDefaultPositiveSpeechThreshold,
     this.negativeSpeechThreshold = kDefaultNegativeSpeechThreshold,
@@ -73,6 +75,7 @@ class SettingsState {
     bool? saveAudio,
     AudioSaveFormat? audioFormat,
     TargetLanguage? targetLanguage,
+    bool? saveAudioLocal,
     int? frameSamples,
     double? positiveSpeechThreshold,
     double? negativeSpeechThreshold,
@@ -88,6 +91,7 @@ class SettingsState {
         saveAudio: saveAudio ?? this.saveAudio,
         audioFormat: audioFormat ?? this.audioFormat,
         targetLanguage: targetLanguage ?? this.targetLanguage,
+        saveAudioLocal: saveAudioLocal ?? this.saveAudioLocal,
         frameSamples: frameSamples ?? this.frameSamples,
         positiveSpeechThreshold:
             positiveSpeechThreshold ?? this.positiveSpeechThreshold,
@@ -118,6 +122,10 @@ class SettingsNotifier extends Notifier<SettingsState> {
 
   void setSaveAudio(bool enabled) {
     state = state.copyWith(saveAudio: enabled);
+  }
+
+  void setSaveAudioLocal(bool enabled) {
+    state = state.copyWith(saveAudioLocal: enabled);
   }
 
   void setAudioFormat(AudioSaveFormat format) {

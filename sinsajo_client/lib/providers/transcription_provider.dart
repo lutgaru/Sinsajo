@@ -3,7 +3,9 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:path_provider/path_provider.dart';
 import '../services/audio_service.dart';
+import '../services/local_wav_writer.dart';
 import '../services/ws_service.dart';
 import 'settings_provider.dart';
 
@@ -15,6 +17,7 @@ class TranscriptionState {
   final String? error;
   final String? serverModel;
   final List<String>? supportedLanguages;
+  final String? localAudioPath;
 
   const TranscriptionState({
     this.isRecording = false,
@@ -24,6 +27,7 @@ class TranscriptionState {
     this.error,
     this.serverModel,
     this.supportedLanguages,
+    this.localAudioPath,
   });
 
   String get fullText => segments.join(' ');
@@ -36,7 +40,9 @@ class TranscriptionState {
     String?       error,
     String?       serverModel,
     List<String>? supportedLanguages,
+    String?       localAudioPath,
     bool          clearError = false,
+    bool          clearLocalAudioPath = false,
   }) =>
       TranscriptionState(
         isRecording: isRecording ?? this.isRecording,
@@ -46,6 +52,9 @@ class TranscriptionState {
         error:       clearError ? null : (error ?? this.error),
         serverModel: serverModel ?? this.serverModel,
         supportedLanguages: supportedLanguages ?? this.supportedLanguages,
+        localAudioPath: clearLocalAudioPath
+            ? null
+            : (localAudioPath ?? this.localAudioPath),
       );
 }
 
@@ -55,6 +64,7 @@ class TranscriptionNotifier extends Notifier<TranscriptionState> {
   StreamSubscription?     _audioSub;
   StreamSubscription?     _wsStatusSub;
   StreamSubscription?     _wsMessageSub;
+  LocalWavWriter?         _localWav;
 
   @override
   TranscriptionState build() {
@@ -166,23 +176,40 @@ class TranscriptionNotifier extends Notifier<TranscriptionState> {
     _sendStartWithSettings();
     final settings = ref.read(settingsProvider);
     _audio.gain = settings.micGain;
-    await _audio.start(
-      audioSource: settings.audioSource,
-      frameSamples: settings.frameSamples,
-      positiveSpeechThreshold: settings.positiveSpeechThreshold,
-      negativeSpeechThreshold: settings.negativeSpeechThreshold,
-      redemptionFrames: settings.redemptionFrames,
-      preSpeechPadFrames: settings.preSpeechPadFrames,
-      minSpeechFrames: settings.minSpeechFrames,
-      endSpeechPadFrames: settings.endSpeechPadFrames,
-    );
+    String? localAudioError;
+    _localWav = await _maybeStartLocalWriter(settings, onError: (msg) {
+      localAudioError = msg;
+    });
+    try {
+      await _audio.start(
+        audioSource: settings.audioSource,
+        frameSamples: settings.frameSamples,
+        positiveSpeechThreshold: settings.positiveSpeechThreshold,
+        negativeSpeechThreshold: settings.negativeSpeechThreshold,
+        redemptionFrames: settings.redemptionFrames,
+        preSpeechPadFrames: settings.preSpeechPadFrames,
+        minSpeechFrames: settings.minSpeechFrames,
+        endSpeechPadFrames: settings.endSpeechPadFrames,
+      );
+    } catch (_) {
+      // Avoid leaving an orphaned empty WAV behind when recording fails.
+      await _finishLocalWriter(keep: false);
+      rethrow;
+    }
 
     _audioSub = _audio.chunks.listen((chunk) {
       debugPrint('[Audio] → Enviando chunk: ${chunk.pcmBytes.length} bytes, isFinal=${chunk.isFinal}');
       _ws.sendAudioChunk(chunk.pcmBytes);
+      // IOSink.add preserves order synchronously, so no chaining needed
+      // and RAM stays flat (bytes go straight to the OS buffer).
+      unawaited(_localWav?.append(chunk.pcmBytes));
     });
 
-    state = state.copyWith(isRecording: true, clearError: true);
+    state = state.copyWith(
+      isRecording: true,
+      clearError: localAudioError == null,
+      error: localAudioError,
+    );
   }
 
   Future<void> pauseRecording() async {
@@ -190,6 +217,8 @@ class TranscriptionNotifier extends Notifier<TranscriptionState> {
     await _audioSub?.cancel();
     _audioSub = null;
     await _audio.pause();
+    // Keep the WAV open: resume appends to the same single session file.
+    await _localWav?.flush();
     state = state.copyWith(isPaused: true);
   }
 
@@ -220,7 +249,11 @@ class TranscriptionNotifier extends Notifier<TranscriptionState> {
     await _audioSub?.cancel();
     _audioSub = null;
 
-    await _audio.stop();
+    try {
+      await _audio.stop();
+    } finally {
+      await _finishLocalWriter(keep: true);
+    }
     _ws.sendStop();
     _ws.sendClean();
 
@@ -240,10 +273,66 @@ class TranscriptionNotifier extends Notifier<TranscriptionState> {
     await _audioSub?.cancel();
     _audioSub = null;
 
-    await _audio.stop();
+    try {
+      await _audio.stop();
+    } finally {
+      // Discarding means the transcription is thrown away, so the local
+      // preview file is deleted too instead of kept.
+      await _finishLocalWriter(keep: false);
+    }
     _ws.sendDiscard();
 
     state = state.copyWith(isRecording: false, isPaused: false, segments: []);
+  }
+
+  /// Opens a new single-file WAV session recording when the user enabled
+  /// client-side saving. Returns null when disabled, on Web, or on failure
+  /// (recording continues without local saving in that case).
+  Future<LocalWavWriter?> _maybeStartLocalWriter(
+    SettingsState settings, {
+    required void Function(String message) onError,
+  }) async {
+    if (!settings.saveAudioLocal || kIsWeb) return null;
+    try {
+      final dir = await getApplicationDocumentsDirectory();
+      final writer = await createLocalWavWriter(
+        directoryPath: '${dir.path}/sinsajo_recordings',
+        fileName: _localSessionFileName(DateTime.now()),
+        sampleRate: kSampleRate,
+      );
+      await writer.open();
+      return writer;
+    } catch (e) {
+      debugPrint('[LocalAudio] ⚠️ Could not start local recording: $e');
+      onError('Could not save local audio: $e');
+      return null;
+    }
+  }
+
+  /// Finalizes the session file (keep) or deletes it (discard).
+  Future<void> _finishLocalWriter({required bool keep}) async {
+    final writer = _localWav;
+    _localWav = null;
+    if (writer == null) return;
+    try {
+      if (keep) {
+        await writer.finalize();
+        state = state.copyWith(localAudioPath: writer.path);
+      } else {
+        await writer.discard();
+        state = state.copyWith(clearLocalAudioPath: true);
+      }
+    } catch (e) {
+      debugPrint('[LocalAudio] ⚠️ Could not finish local recording: $e');
+    }
+  }
+
+  String _localSessionFileName(DateTime t) {
+    String two(int n) => n.toString().padLeft(2, '0');
+    final date = '${t.year}${two(t.month)}${two(t.day)}';
+    final time =
+        '${two(t.hour)}${two(t.minute)}${two(t.second)}_${t.millisecond.toString().padLeft(3, '0')}';
+    return 'sinsajo_${date}_$time.wav';
   }
 }
 

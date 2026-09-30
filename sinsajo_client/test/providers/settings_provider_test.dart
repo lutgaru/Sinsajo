@@ -27,6 +27,12 @@ void main() {
       expect(state.targetLanguage, TargetLanguage.english);
     });
 
+    test('defaults to local audio saving disabled', () {
+      const state = SettingsState();
+
+      expect(state.saveAudioLocal, isFalse);
+    });
+
     test('copyWith updates targetLanguage', () {
       const state = SettingsState();
       final updated = state.copyWith(targetLanguage: TargetLanguage.spanish);
@@ -45,6 +51,17 @@ void main() {
       container.read(settingsProvider.notifier).setTargetLanguage(TargetLanguage.portuguese);
 
       expect(container.read(settingsProvider).targetLanguage, TargetLanguage.portuguese);
+    });
+
+    test('setSaveAudioLocal updates state', () {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      expect(container.read(settingsProvider).saveAudioLocal, isFalse);
+
+      container.read(settingsProvider.notifier).setSaveAudioLocal(true);
+
+      expect(container.read(settingsProvider).saveAudioLocal, isTrue);
     });
   });
 }

@@ -81,6 +81,18 @@ void main() {
       expect(state.supportedLanguages, ['en']);
     });
 
+    test('local audio path state handling', () {
+      var state = const TranscriptionState();
+
+      expect(state.localAudioPath, isNull);
+
+      state = state.copyWith(localAudioPath: '/docs/sinsajo_1.wav');
+      expect(state.localAudioPath, '/docs/sinsajo_1.wav');
+
+      state = state.copyWith(clearLocalAudioPath: true);
+      expect(state.localAudioPath, isNull);
+    });
+
     test('complex state update', () {
       var state = const TranscriptionState();
 

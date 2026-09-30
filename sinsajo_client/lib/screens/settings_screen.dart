@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:record/record.dart';
@@ -152,6 +153,71 @@ class SettingsScreen extends ConsumerWidget {
                     }
                   : null,
             ),
+            const SizedBox(height: 24),
+            Text(
+              'Client audio saving',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Save audio on this device'),
+              subtitle: Text(
+                kIsWeb
+                    ? 'Not supported on Web'
+                    : 'Store VAD speech as one WAV file (16 kHz mono) per session, so you can listen back to what was transcribed',
+              ),
+              value: settings.saveAudioLocal,
+              onChanged: kIsWeb
+                  ? null
+                  : (value) {
+                      ref
+                          .read(settingsProvider.notifier)
+                          .setSaveAudioLocal(value);
+                    },
+            ),
+            if (modelState.localAudioPath != null) ...[
+              const SizedBox(height: 4),
+              Container(
+                width: double.infinity,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.audio_file_outlined,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Last saved session',
+                            style: Theme.of(context).textTheme.titleSmall,
+                          ),
+                          const SizedBox(height: 2),
+                          SelectableText(
+                            modelState.localAudioPath!,
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodySmall
+                                ?.copyWith(
+                                  color:
+                                      Theme.of(context).colorScheme.outline,
+                                ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
             const SizedBox(height: 24),
             Text(
               'Server model',

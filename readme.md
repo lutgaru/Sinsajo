@@ -22,7 +22,7 @@ A self-hosted real-time voice transcription system that converts speech to text 
 - ✅ **Spanish support** - Native Spanish transcription with punctuation
 - ✅ **Target language selection** - Choose the output language (English, Spanish, French, German, Portuguese) from the client settings; translation is applied by models that support it, and the client only enables the languages the active server model advertises
 - ✅ **Self-hosted** - Run on your own hardware
-- ✅ **Audio recording** - Saves session audio (WAV/OGG) to the server, configurable from the client settings
+- ✅ **Audio recording** - Saves session audio (WAV/OGG) to the server, configurable from the client settings; optionally also saves VAD speech as a WAV file on the client device for listen-back
 
 ## 🏗️ Architecture
 
@@ -202,7 +202,7 @@ Edit `sinsajo_client/lib/providers/transcription_provider.dart`:
 const String kWsUrl = 'ws://192.168.1.100:8765';  // ← Your server IP
 ```
 
-Other client options (microphone gain, audio source, audio saving, target language, server IP) are configured from the in-app Settings screen.
+Other client options (microphone gain, audio source, server-side audio saving, client-side audio saving, VAD tuning, target language, server IP) are configured from the in-app Settings screen.
 
 ### VAD Configuration
 
