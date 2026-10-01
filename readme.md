@@ -202,7 +202,7 @@ Edit `sinsajo_client/lib/providers/transcription_provider.dart`:
 const String kWsUrl = 'ws://192.168.1.100:8765';  // ← Your server IP
 ```
 
-Other client options (microphone gain, audio source, server-side audio saving, client-side audio saving, VAD tuning, target language, server IP) are configured from the in-app Settings screen.
+Other client options (microphone gain, audio source, server-side audio saving, client-side audio saving, VAD tuning, target language, server IP) are configured from the in-app Settings screen and persist across restarts (localStorage on Web).
 
 ### VAD Configuration
 
