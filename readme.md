@@ -22,7 +22,7 @@ A self-hosted real-time voice transcription system that converts speech to text 
 - ✅ **Spanish support** - Native Spanish transcription with punctuation
 - ✅ **Target language selection** - Choose the output language (English, Spanish, French, German, Portuguese) from the client settings; translation is applied by models that support it, and the client only enables the languages the active server model advertises
 - ✅ **Self-hosted** - Run on your own hardware
-- ✅ **Audio recording** - Saves session audio (WAV/OGG) to the server, configurable from the client settings; optionally also saves VAD speech as a WAV file on the client device for listen-back
+- ✅ **Audio recording** - Saves session audio (WAV/OGG) to the server, configurable from the client settings; optionally also saves VAD speech as a WAV file on the client device for listen-back, or records the session in the browser (WebM download) on Web
 
 ## 🏗️ Architecture
 

@@ -163,7 +163,7 @@ class SettingsScreen extends ConsumerWidget {
               title: const Text('Save audio on this device'),
               subtitle: Text(
                 kIsWeb
-                    ? 'Not supported on Web'
+                    ? 'Not supported on Web — use the browser recording below'
                     : 'Store VAD speech as one WAV file (16 kHz mono) per session, so you can listen back to what was transcribed',
               ),
               value: settings.saveAudioLocal,
@@ -173,6 +173,23 @@ class SettingsScreen extends ConsumerWidget {
                       ref
                           .read(settingsProvider.notifier)
                           .setSaveAudioLocal(value);
+                    },
+            ),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Record session audio (Web)'),
+              subtitle: Text(
+                !kIsWeb
+                    ? 'Only available on Web — use the device saving above'
+                    : 'Records full microphone audio as WebM/Opus in the browser and downloads it when you stop',
+              ),
+              value: settings.saveAudioWeb,
+              onChanged: !kIsWeb
+                  ? null
+                  : (value) {
+                      ref
+                          .read(settingsProvider.notifier)
+                          .setSaveAudioWeb(value);
                     },
             ),
             if (modelState.localAudioPath != null) ...[

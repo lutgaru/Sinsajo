@@ -63,5 +63,22 @@ void main() {
 
       expect(container.read(settingsProvider).saveAudioLocal, isTrue);
     });
+
+    test('local and web audio saving default to disabled', () {
+      const state = SettingsState();
+
+      expect(state.saveAudioLocal, isFalse);
+      expect(state.saveAudioWeb, isFalse);
+    });
+
+    test('setSaveAudioWeb updates state', () {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      container.read(settingsProvider.notifier).setSaveAudioWeb(true);
+
+      expect(container.read(settingsProvider).saveAudioWeb, isTrue);
+      expect(container.read(settingsProvider).saveAudioLocal, isFalse);
+    });
   });
 }

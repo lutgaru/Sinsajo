@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 import '../services/audio_service.dart';
 import '../services/local_wav_writer.dart';
+import '../services/web_session_recorder.dart';
 import '../services/ws_service.dart';
 import 'settings_provider.dart';
 
@@ -65,6 +66,7 @@ class TranscriptionNotifier extends Notifier<TranscriptionState> {
   StreamSubscription?     _wsStatusSub;
   StreamSubscription?     _wsMessageSub;
   LocalWavWriter?         _localWav;
+  WebSessionRecorder?     _webRec;
 
   @override
   TranscriptionState build() {
@@ -177,9 +179,13 @@ class TranscriptionNotifier extends Notifier<TranscriptionState> {
     final settings = ref.read(settingsProvider);
     _audio.gain = settings.micGain;
     String? localAudioError;
-    _localWav = await _maybeStartLocalWriter(settings, onError: (msg) {
-      localAudioError = msg;
-    });
+    void noteLocalError(String msg) {
+      localAudioError =
+          localAudioError == null ? msg : '$localAudioError\n$msg';
+    }
+
+    _localWav = await _maybeStartLocalWriter(settings, onError: noteLocalError);
+    _webRec = await _maybeStartWebRecorder(settings, onError: noteLocalError);
     try {
       await _audio.start(
         audioSource: settings.audioSource,
@@ -192,8 +198,9 @@ class TranscriptionNotifier extends Notifier<TranscriptionState> {
         endSpeechPadFrames: settings.endSpeechPadFrames,
       );
     } catch (_) {
-      // Avoid leaving an orphaned empty WAV behind when recording fails.
+      // Avoid leaving orphaned empty recordings behind when starting fails.
       await _finishLocalWriter(keep: false);
+      await _finishWebRecorder(keep: false);
       rethrow;
     }
 
@@ -219,6 +226,8 @@ class TranscriptionNotifier extends Notifier<TranscriptionState> {
     await _audio.pause();
     // Keep the WAV open: resume appends to the same single session file.
     await _localWav?.flush();
+    // MediaRecorder pauses into the same single file as well.
+    await _webRec?.pause();
     state = state.copyWith(isPaused: true);
   }
 
@@ -226,6 +235,7 @@ class TranscriptionNotifier extends Notifier<TranscriptionState> {
     if (!state.isPaused) return;
     final settings = ref.read(settingsProvider);
     _audio.gain = settings.micGain;
+    await _webRec?.resume();
     await _audio.resume(
       audioSource: settings.audioSource,
       frameSamples: settings.frameSamples,
@@ -239,6 +249,7 @@ class TranscriptionNotifier extends Notifier<TranscriptionState> {
     _audioSub = _audio.chunks.listen((chunk) {
       debugPrint('[Audio] → Enviando chunk: ${chunk.pcmBytes.length} bytes, isFinal=${chunk.isFinal}');
       _ws.sendAudioChunk(chunk.pcmBytes);
+      unawaited(_localWav?.append(chunk.pcmBytes));
     });
     state = state.copyWith(isPaused: false);
   }
@@ -253,6 +264,7 @@ class TranscriptionNotifier extends Notifier<TranscriptionState> {
       await _audio.stop();
     } finally {
       await _finishLocalWriter(keep: true);
+      await _finishWebRecorder(keep: true);
     }
     _ws.sendStop();
     _ws.sendClean();
@@ -279,6 +291,7 @@ class TranscriptionNotifier extends Notifier<TranscriptionState> {
       // Discarding means the transcription is thrown away, so the local
       // preview file is deleted too instead of kept.
       await _finishLocalWriter(keep: false);
+      await _finishWebRecorder(keep: false);
     }
     _ws.sendDiscard();
 
@@ -333,6 +346,45 @@ class TranscriptionNotifier extends Notifier<TranscriptionState> {
     final time =
         '${two(t.hour)}${two(t.minute)}${two(t.second)}_${t.millisecond.toString().padLeft(3, '0')}';
     return 'sinsajo_${date}_$time.wav';
+  }
+
+  /// Starts the browser MediaRecorder when the user enabled Web saving.
+  /// Returns null when disabled, off Web, or on failure (transcription
+  /// continues without the browser recording in that case).
+  Future<WebSessionRecorder?> _maybeStartWebRecorder(
+    SettingsState settings, {
+    required void Function(String message) onError,
+  }) async {
+    if (!settings.saveAudioWeb || !kIsWeb) return null;
+    try {
+      final recorder = createWebSessionRecorder();
+      await recorder.start();
+      return recorder;
+    } catch (e) {
+      debugPrint('[WebAudio] ⚠️ Could not start browser recording: $e');
+      onError('Could not record browser audio: $e');
+      return null;
+    }
+  }
+
+  /// Downloads the session file (keep) or throws it away (discard).
+  Future<void> _finishWebRecorder({required bool keep}) async {
+    final recorder = _webRec;
+    _webRec = null;
+    if (recorder == null) return;
+    try {
+      if (keep) {
+        final fileName = await recorder.stopAndDownload();
+        if (fileName != null) {
+          state = state.copyWith(localAudioPath: fileName);
+        }
+      } else {
+        await recorder.discard();
+        state = state.copyWith(clearLocalAudioPath: true);
+      }
+    } catch (e) {
+      debugPrint('[WebAudio] ⚠️ Could not finish browser recording: $e');
+    }
   }
 }
 
