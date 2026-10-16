@@ -10,15 +10,17 @@ pub const DEFINITION: ModelDefinition = ModelDefinition {
     dir: "parakeet-tdt-0.6b-v3-onnx",
     display: "Parakeet TDT 0.6b v3",
     files: &[
-        ModelFile { repo: "istupakov/parakeet-tdt-0.6b-v3-onnx", path: "config.json" },
-        ModelFile { repo: "istupakov/parakeet-tdt-0.6b-v3-onnx", path: "decoder_joint-model.int8.onnx" },
-        ModelFile { repo: "istupakov/parakeet-tdt-0.6b-v3-onnx", path: "decoder_joint-model.onnx" },
-        ModelFile { repo: "istupakov/parakeet-tdt-0.6b-v3-onnx", path: "encoder-model.int8.onnx" },
-        ModelFile { repo: "istupakov/parakeet-tdt-0.6b-v3-onnx", path: "encoder-model.onnx" },
-        ModelFile { repo: "istupakov/parakeet-tdt-0.6b-v3-onnx", path: "encoder-model.onnx.data" },
-        ModelFile { repo: "istupakov/parakeet-tdt-0.6b-v3-onnx", path: "nemo128.onnx" },
-        ModelFile { repo: "istupakov/parakeet-tdt-0.6b-v3-onnx", path: "vocab.txt" },
+        ModelFile { repo: Some("istupakov/parakeet-tdt-0.6b-v3-onnx"), url: None, path: "config.json" },
+        ModelFile { repo: Some("istupakov/parakeet-tdt-0.6b-v3-onnx"), url: None, path: "decoder_joint-model.int8.onnx" },
+        ModelFile { repo: Some("istupakov/parakeet-tdt-0.6b-v3-onnx"), url: None, path: "decoder_joint-model.onnx" },
+        ModelFile { repo: Some("istupakov/parakeet-tdt-0.6b-v3-onnx"), url: None, path: "encoder-model.int8.onnx" },
+        ModelFile { repo: Some("istupakov/parakeet-tdt-0.6b-v3-onnx"), url: None, path: "encoder-model.onnx" },
+        ModelFile { repo: Some("istupakov/parakeet-tdt-0.6b-v3-onnx"), url: None, path: "encoder-model.onnx.data" },
+        ModelFile { repo: Some("istupakov/parakeet-tdt-0.6b-v3-onnx"), url: None, path: "nemo128.onnx" },
+        ModelFile { repo: Some("istupakov/parakeet-tdt-0.6b-v3-onnx"), url: None, path: "vocab.txt" },
     ],
+    archives: &[],
+    executable: None,
 };
 
 // Parakeet is English-only; the client enables only "en".

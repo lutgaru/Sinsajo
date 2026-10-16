@@ -21,6 +21,9 @@ mod model;
 #[derive(Parser)]
 #[command(name = "sinsajo-server", version, about = "Speech-to-text WebSocket server")]
 struct Args {
+    /// Model name (e.g. ParakeetTDT, Canary180M, Canary1BV2, CohereInt4,
+    /// SenseVoice, GigaAM, MoonshineBase, WhisperSmall, WhisperfileSmall).
+    /// Full list is printed when an unknown name is given.
     #[arg(long)]
     model: Option<String>,
 
@@ -48,13 +51,18 @@ struct ClientMessage {
     target_language: Option<String>,
 }
 
-// BCP-47 language codes the transcription models accept as output language.
-// Canary's vocabulary carries a prompt token for each of these; Parakeet is
-// English-only and ignores the target language.
-fn valid_target_language(s: &str) -> Option<String> {
-    match s.to_ascii_lowercase().as_str() {
-        "en" | "es" | "fr" | "de" | "pt" => Some(s.to_ascii_lowercase()),
-        _ => None,
+// BCP-47 language codes accepted as output language.
+// The global union (see `model::is_supported_language_code`) rejects typos;
+// the loaded model's `supported_languages()` decides per-session.
+fn valid_target_language(s: &str, supported: &[&str]) -> Option<String> {
+    let lower = s.to_ascii_lowercase();
+    if !model::is_supported_language_code(&lower) {
+        return None;
+    }
+    if supported.iter().any(|l| l.eq_ignore_ascii_case(&lower)) {
+        Some(lower)
+    } else {
+        None
     }
 }
 
@@ -304,7 +312,14 @@ async fn handle_connection(
                                     }
                                 }
                                 if let Some(lang) = &client_msg.target_language {
-                                    session_target_language = valid_target_language(lang);
+                                    let supported: Vec<String> = {
+                                        let m = model.lock().await;
+                                        m.supported_languages().iter().map(|s| s.to_string()).collect()
+                                    };
+                                    let supported_ref: Vec<&str> =
+                                        supported.iter().map(|s| s.as_str()).collect();
+                                    session_target_language =
+                                        valid_target_language(lang, &supported_ref);
                                 }
                                 println!(
                                     "▶ Session started (save_audio={}, format={}, target_language={})",
@@ -553,19 +568,26 @@ mod tests {
 
     #[test]
     fn valid_target_language_accepts_supported_codes() {
-        for code in ["en", "es", "fr", "de", "pt"] {
-            assert_eq!(valid_target_language(code), Some(code.to_string()));
+        // Canary Flash: en/de/es/fr (no pt — matches upstream FLASH_LANGUAGES).
+        let flash = ["en", "de", "es", "fr"];
+        for code in flash {
+            assert_eq!(valid_target_language(code, &flash), Some(code.to_string()));
         }
         // Case-insensitive
-        assert_eq!(valid_target_language("ES"), Some("es".to_string()));
-        assert_eq!(valid_target_language("Pt"), Some("pt".to_string()));
+        assert_eq!(valid_target_language("ES", &flash), Some("es".to_string()));
+        // Model-scoped: pt is a known code but not a Flash language.
+        assert_eq!(valid_target_language("pt", &flash), None);
+        // Canary V2 supports pt.
+        let v2 = ["en", "pt", "uk"];
+        assert_eq!(valid_target_language("pt", &v2), Some("pt".to_string()));
     }
 
     #[test]
     fn valid_target_language_rejects_unknown_codes() {
-        assert_eq!(valid_target_language("xx"), None);
-        assert_eq!(valid_target_language(""), None);
-        assert_eq!(valid_target_language("english"), None);
+        let flash = ["en", "de", "es", "fr"];
+        assert_eq!(valid_target_language("xx", &flash), None);
+        assert_eq!(valid_target_language("", &flash), None);
+        assert_eq!(valid_target_language("english", &flash), None);
     }
 
     #[test]
