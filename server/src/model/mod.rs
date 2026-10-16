@@ -122,19 +122,68 @@ pub const MODELS: &[&ModelDefinition] = &[
     &whisperfile::DEFINITION_SMALL,
 ];
 
+/// Models that exist but are compiled out of this binary because their
+/// cargo feature was not enabled at build time: (model flag, feature).
+/// Each list is empty when its feature IS enabled (the models are then in
+/// `MODELS`), so the unknown-model error can point at the right rebuild.
+#[cfg(not(feature = "whisper-cpp"))]
+const GATED_WHISPER: &[(&str, &str)] = &[
+    ("WhisperTinyEn", "whisper-cpp"),
+    ("WhisperSmall", "whisper-cpp"),
+];
+#[cfg(feature = "whisper-cpp")]
+const GATED_WHISPER: &[(&str, &str)] = &[];
+
+#[cfg(not(feature = "whisperfile"))]
+const GATED_WHISPERFILE: &[(&str, &str)] = &[("WhisperfileSmall", "whisperfile")];
+#[cfg(feature = "whisperfile")]
+const GATED_WHISPERFILE: &[(&str, &str)] = &[];
+
+fn gated_feature_for(name: &str) -> Option<&'static str> {
+    GATED_WHISPER
+        .iter()
+        .chain(GATED_WHISPERFILE.iter())
+        .find(|(gated, _)| gated.eq_ignore_ascii_case(name))
+        .map(|(_, feature)| *feature)
+}
+
 pub fn get_model_info(name: &str) -> &'static ModelDefinition {
-    MODELS.iter().find(|m| m.name == name).copied().unwrap_or_else(|| {
-        eprintln!(
-            "Unknown model '{}'. Valid models: {}",
-            name,
-            MODELS
-                .iter()
-                .map(|m| m.name)
-                .collect::<Vec<_>>()
-                .join(", ")
-        );
+    if let Some(def) = MODELS.iter().find(|m| m.name == name).copied() {
+        return def;
+    }
+    if let Some(feature) = gated_feature_for(name) {
+        eprintln!("Model '{name}' needs the '{feature}' cargo feature, which this binary was built without.");
+        eprintln!("Rebuild with: cargo build --release --features {feature}");
+        eprintln!("(Docker: docker build --build-arg FEATURES={feature} .)");
         std::process::exit(1);
-    })
+    }
+    // Case-insensitive suggestion for typos.
+    if let Some(def) = MODELS
+        .iter()
+        .find(|m| m.name.eq_ignore_ascii_case(name))
+        .copied()
+    {
+        eprintln!("Unknown model '{name}'. Did you mean '{}'?", def.name);
+        std::process::exit(1);
+    }
+    eprintln!(
+        "Unknown model '{}'. Valid models: {}",
+        name,
+        MODELS
+            .iter()
+            .map(|m| m.name)
+            .collect::<Vec<_>>()
+            .join(", ")
+    );
+    let gated: Vec<String> = GATED_WHISPER
+        .iter()
+        .chain(GATED_WHISPERFILE.iter())
+        .map(|(gated, feature)| format!("{gated} (--features {feature})"))
+        .collect();
+    if !gated.is_empty() {
+        eprintln!("Feature-gated (rebuild to enable): {}", gated.join(", "));
+    }
+    std::process::exit(1);
 }
 
 // ── Model trait ────────────────────────────────────────────────────────────────
@@ -502,8 +551,22 @@ mod tests {
     }
 
     #[test]
-    fn language_union_covers_engine_spot_checks() {
-        for code in ["en", "es", "ru", "yue", "haw", "nn", "mt", "uk", "zh"] {
+    fn gated_lookup_points_at_missing_features() {
+        // Unknown names never match, regardless of features.
+        assert_eq!(gated_feature_for("NoSuchModel"), None);
+        // Lookup is case-insensitive, matching the error path.
+        #[cfg(not(feature = "whisper-cpp"))]
+        assert_eq!(gated_feature_for("whispersmall"), Some("whisper-cpp"));
+        #[cfg(feature = "whisper-cpp")]
+        assert_eq!(gated_feature_for("WhisperSmall"), None);
+        #[cfg(not(feature = "whisperfile"))]
+        assert_eq!(gated_feature_for("WhisperfileSmall"), Some("whisperfile"));
+        #[cfg(feature = "whisperfile")]
+        assert_eq!(gated_feature_for("WhisperfileSmall"), None);
+    }
+
+    #[test]
+    fn language_union_covers_engine_spot_checks() {        for code in ["en", "es", "ru", "yue", "haw", "nn", "mt", "uk", "zh"] {
             assert!(is_supported_language_code(code), "{code} should be known");
         }
         assert!(is_supported_language_code("ES"));

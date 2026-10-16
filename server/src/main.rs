@@ -23,7 +23,8 @@ mod model;
 struct Args {
     /// Model name (e.g. ParakeetTDT, Canary180M, Canary1BV2, CohereInt4,
     /// SenseVoice, GigaAM, MoonshineBase, WhisperSmall, WhisperfileSmall).
-    /// Full list is printed when an unknown name is given.
+    /// An unknown name prints the flags compiled into this binary; Whisper*
+    /// needs --features whisper-cpp and Whisperfile* --features whisperfile.
     #[arg(long)]
     model: Option<String>,
 
