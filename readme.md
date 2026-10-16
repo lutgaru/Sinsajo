@@ -389,6 +389,8 @@ cargo run --release --features whisper-cpp -- --model WhisperSmall --autodownloa
 
 #### Supported models
 
+The default binary only includes the ONNX models. An unknown `--model` name prints the flags compiled into your binary, plus rebuild hints for feature-gated ones (`Whisper*` needs `--features whisper-cpp`, `Whisperfile*` needs `--features whisperfile`).
+
 | Model flag | Engine | Languages | Notes |
 |------------|--------|-----------|-------|
 | `ParakeetTDT` | Parakeet TDT 0.6B v3 (int8) | en | English-only, most accurate |
