@@ -65,7 +65,7 @@ import { Tabs, TabItem, Aside, Card, CardGrid } from '@astrojs/starlight/compone
 
     | Arg | Default | Description |
     |-----|---------|-------------|
-    | `--model` | prompt | `ParakeetTDT` or `Canary180M` |
+    | `--model` | prompt | Model flag (see Models below; e.g. `ParakeetTDT`, `Canary180M`, `Canary1BV2`, `WhisperSmall`) |
     | `--autodownload-model` | `false` | Auto-download if missing |
     | `--port` | `8765` | WebSocket port |
     | `--model-dir` | `./models` | Model storage |
@@ -82,17 +82,17 @@ import { Tabs, TabItem, Aside, Card, CardGrid } from '@astrojs/starlight/compone
     cargo build --release && ./target/release/sinsajo-server --help
     ```
 
-    Add new models in `src/config.rs` (`MODELS` array) with HuggingFace repo + folder. If `--model` is omitted it reads `sinsajo-config.json`, then prompts.
+    Add new models as a module under `server/src/model/` implementing the `Model` trait plus a `ModelDefinition` entry. If `--model` is omitted it reads `sinsajo-config.json`, then prompts.
 
-    Available: `ParakeetTDT` (0.6B, more accurate, English) and `Canary180M` (180M, faster, multilingual).
+    Available: `ParakeetTDT` (0.6B, more accurate, English), `Canary180M` / `Canary1BFlash` (Flash, faster, en/de/es/fr), `Canary1BV2` (25 languages), `CohereInt4` / `CohereInt8` (14 languages), `SenseVoice` (zh/en/ja/ko/yue), `GigaAM` (Russian), `MoonshineTiny` / `MoonshineBase` / `MoonshineBaseEs` + tiny lang variants + `MoonshineStreamingTinyEn`, and — with cargo features — `WhisperTinyEn` / `WhisperSmall` (`--features whisper-cpp`) and `WhisperfileSmall` (`--features whisperfile`).
   </TabItem>
 </Tabs>
 
 ## Models
 
-Auto-download handles ~2–3GB on first run. Subsequent starts ~2–3s. Override dirs with `--model-dir` / `--records-dir`.
+Auto-download handles first-run downloads (HuggingFace single files, or mirror tarballs for Moonshine/SenseVoice/Whisperfile). Subsequent starts ~2–3s. Override dirs with `--model-dir` / `--records-dir`.
 
-Current models: `ParakeetTDT` (TDT 0.6B, English) and `Canary180M` (Canary 180M Flash, multilingual). Edit `server/src/config.rs` to add more.
+Full list: `ParakeetTDT`, `Canary180M`, `Canary1BFlash`, `Canary1BV2`, `CohereInt4`, `CohereInt8`, `SenseVoice`, `GigaAM`, `MoonshineTiny`, `MoonshineBase`, `MoonshineBaseEs`, `MoonshineTinyAr/Zh/Ja/Ko/Uk/Vi` (manual weights), `MoonshineStreamingTinyEn`, `WhisperTinyEn`, `WhisperSmall`, `WhisperfileSmall`. An unknown `--model` name prints all valid flags. The OpenAI remote engine is intentionally excluded (Sinsajo is 100% offline).
 
 ## GPU acceleration
 
@@ -103,7 +103,7 @@ set_ort_accelerator(OrtAccelerator::Cuda); // or Auto
 
 ## Translation
 
-Canary supports `target_language` from client `start` message. Server forwards to `transcribe_with`:
+Canary supports `target_language` from client `start` message (Flash: en/de/es/fr; v2: 25 languages). Server forwards to `transcribe_with`:
 
 ```rust
 model.transcribe_with(&samples, &CanaryParams {
@@ -113,7 +113,7 @@ model.transcribe_with(&samples, &CanaryParams {
 })?;
 ```
 
-Parakeet is English-only and ignores the target language. See [Protocol](/Sinsajo/guides/protocol/).
+Parakeet is English-only and ignores the target language; Whisper/Whisperfile use it as the language hint. See [Protocol](/Sinsajo/guides/protocol/).
 
 ## Persistence
 

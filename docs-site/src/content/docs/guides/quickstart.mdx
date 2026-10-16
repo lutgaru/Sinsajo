@@ -83,7 +83,7 @@ Skip this if you only use Docker or precompiled binaries / Web App / APK.
 
     | Arg | Default | Description |
     |-----|---------|-------------|
-    | `--model` | prompt | `ParakeetTDT` or `Canary180M` |
+    | `--model` | prompt | Model flag (e.g. `ParakeetTDT`, `Canary180M`, `Canary1BV2`) |
     | `--autodownload-model` | `false` | Auto-download if missing |
     | `--port` | `8765` | WebSocket port |
     | `--model-dir` | `./models` | Model storage |
@@ -104,7 +104,7 @@ Skip this if you only use Docker or precompiled binaries / Web App / APK.
 </Tabs>
 
 <Aside type="tip" title="Model download">
-  Server auto-downloads on first run (~2–3GB from HuggingFace). Override dirs with `--model-dir` / `--records-dir`. Use `Canary180M` for smaller/faster multilingual, `ParakeetTDT` for English accuracy.
+  Server auto-downloads on first run (HuggingFace, or mirror tarballs for Moonshine/SenseVoice/Whisperfile). Override dirs with `--model-dir` / `--records-dir`. Use `Canary180M` for smaller/faster multilingual, `ParakeetTDT` for English accuracy, `Canary1BV2` for 25 languages.
 </Aside>
 
 ## 2. Connect a Client — pick one

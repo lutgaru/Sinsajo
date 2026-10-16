@@ -14,11 +14,11 @@ description: Data flow, components and protocol.
        │ Silero VAD v5                                   │ ONNX Model
        │ (ONNX Runtime)                                  │
        ▼                                                 ▼
- ┌─────────────────┐                             ┌──────────────────┐
- │  AudioService   │                             │  Canary 180M     │
- │  + vad package  │                             │  Flash /         │
- │  (ML-based)     │                             │  Parakeet TDT    │
- └─────────────────┘                             └──────────────────┘
+  ┌─────────────────┐                             ┌──────────────────┐
+  │  AudioService   │                             │  Parakeet /      │
+  │  + vad package  │                             │  Canary / Cohere │
+  │  (ML-based)     │                             │  Moonshine / …   │
+  └─────────────────┘                             └──────────────────┘
 ```
 
 ### Data flow
@@ -26,7 +26,7 @@ description: Data flow, components and protocol.
 1. **Audio Capture** — Flutter `record` → PCM 16-bit @ 16kHz
 2. **VAD** — Silero VAD v5 via `vad` package (ONNX Runtime), emits only speech chunks
 3. **WebSocket** — Binary PCM chunks + JSON control messages
-4. **Transcription** — Rust server (`transcribe-rs` + ONNX Runtime) with Canary/Parakeet
+4. **Transcription** — Rust server (`transcribe-rs`: ONNX Runtime, optional whisper-cpp/whisperfile) with the selected local model
 5. **Recording** — Optional WAV/OGG saved to `records/` on `clean`
 6. **Display** — Client renders text in real-time
 
@@ -39,8 +39,8 @@ sinsajo/
 │   ├── lib/screens/transcription_screen.dart
 │   └── lib/services/{audio_service.dart, ws_service.dart}
 ├── server/           # Rust
-│   ├── src/{main.rs, config.rs, model_downloader.rs}
-│   └── models/       # downloaded ONNX models
+│   ├── src/{main.rs, config.rs, model/}
+│   └── models/       # downloaded models
 ├── docs-site/        # Astro Starlight (this site) -> GitHub Pages
 └── .github/workflows/
     ├── client.yml

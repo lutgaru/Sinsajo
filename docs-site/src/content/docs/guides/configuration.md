@@ -13,7 +13,7 @@ docker run lutgaru/sinsajo-server:latest --help
 
 | Arg | Default | Description |
 |-----|---------|-------------|
-| `--model` | prompt | `ParakeetTDT` / `Canary180M` |
+| `--model` | prompt | Model flag (see Server → Models; e.g. `ParakeetTDT`, `Canary1BV2`, `WhisperSmall`) |
 | `--autodownload-model` | false | Download if missing |
 | `--port` | 8765 | WebSocket port |
 | `--model-dir` | ./models | Model storage |
@@ -24,7 +24,7 @@ Env / file: `sinsajo-config.json` persists last chosen model.
 ## Client Settings (in-app)
 
 - **Server IP** — `kWsUrl` default; overridden in Settings UI
-- **Target language** — `en/es/fr/de/pt` (enabled per `model_info.languages`)
+- **Target language** — 100-language picker (enabled per `model_info.languages` of the active model)
 - **Save audio** — toggle + format `wav/ogg`
 - **Microphone gain / source**
 

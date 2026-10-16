@@ -21,7 +21,7 @@ All control messages are JSON over WebSocket. Audio is binary PCM.
 
 - `save_audio`: bool, save recording on `clean`
 - `format`: `wav` | `ogg`
-- `target_language`: `en|es|fr|de|pt` — translated if model supports, otherwise ignored
+- `target_language`: BCP-47 code (e.g. `es`) — validated against the loaded model's supported languages; translated if the model supports it, otherwise used as a hint or ignored
 
 **Audio chunks:** Binary `PCM 16-bit mono @ 16kHz` (only speech frames passed through VAD)
 
@@ -49,7 +49,7 @@ Also accepted by client: `partial`, `final`.
 ```json
 {"type": "status", "message": "ready"}
 {"type": "error", "message": "..."}
-{"type": "model_info", "model": "Canary180M", "languages": ["en","es","fr","de","pt"]}
+{"type": "model_info", "model": "Canary1BV2", "languages": ["bg","hr","cs", "..."]}
 ```
 
 `model_info` is sent on connect. Client uses it to show active model and enable only supported languages in Settings.

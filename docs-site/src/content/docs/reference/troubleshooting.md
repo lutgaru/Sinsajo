@@ -49,11 +49,11 @@ Lower thresholds for quiet speakers.
 - Use Int8 model (default is Int8)
 - Enable CUDA/DirectML via `transcribe-rs`
 - Reduce chunk size in VAD config
-- Try `--model Canary180M` (180M vs 600M)
+- Try a smaller model: `--model Canary180M` or `--model MoonshineTiny` (tiny vs 0.6B)
 
 ## Models not downloading
 
-Check `models/` permissions and HuggingFace connectivity. Run with `--model-dir` to an empty writable dir and `--autodownload-model`.
+Check `models/` permissions and connectivity (HuggingFace + mirror tarballs for Moonshine/SenseVoice/Whisperfile). Run with `--model-dir` to an empty writable dir and `--autodownload-model`. An unknown `--model` name prints all valid flags.
 
 ## APK not installing
 

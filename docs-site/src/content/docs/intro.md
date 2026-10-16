@@ -5,7 +5,7 @@ description: What Sinsajo is, features and when to use it.
 
 # Introduction
 
-**Sinsajo** is a self-hosted real-time voice transcription system. Flutter client + Rust server, local AI models, Voice Activity Detection (VAD), and support for **Canary 180M Flash** and **Parakeet TDT 0.6B**.
+**Sinsajo** is a self-hosted real-time voice transcription system. Flutter client + Rust server, local AI models, Voice Activity Detection (VAD), and support for all local engines from `transcribe-rs`: **Parakeet**, **Canary** (180M Flash / 1B Flash / 1B v2), **Cohere**, **SenseVoice**, **GigaAM**, **Moonshine** (+ streaming), **Whisper** and **Whisperfile**.
 
 > No cloud. No API keys. Your audio never leaves your network.
 
@@ -16,7 +16,7 @@ description: What Sinsajo is, features and when to use it.
 - ✅ Voice Activity Detection — Silero VAD v5 (ONNX Runtime), only speech is sent
 - ✅ Low latency — ~150–300ms end-to-end
 - ✅ Multi-platform — Android, iOS, Desktop, **Web** (Flutter)
-- ✅ Spanish native + target language selection (en/es/fr/de/pt)
+- ✅ Spanish native + target language selection (100-language picker, enabled per model's advertised support)
 - ✅ Self-hosted — Docker or Cargo
 - ✅ Audio recording — WAV/OGG saved server-side, configurable from client
 
@@ -25,7 +25,7 @@ description: What Sinsajo is, features and when to use it.
 | Layer | Stack |
 |-------|-------|
 | Client | Flutter 3.x, Material 3, Riverpod 2.x, `record`, `web_socket_channel`, `vad` (Silero VAD v5) |
-| Server | Rust + Tokio, `tokio-tungstenite`, `transcribe-rs` (ONNX Runtime), Canary/Parakeet Int8 |
+| Server | Rust + Tokio, `tokio-tungstenite`, `transcribe-rs` (ONNX Runtime; optional whisper-cpp/whisperfile), 20+ local model flags |
 | Hosting | GitHub Pages (static) for landing + docs + Flutter Web; Rust server on your infra |
 | Distribution | APK via GitHub Releases, Docker Hub `lutgaru/sinsajo-server` |
 
