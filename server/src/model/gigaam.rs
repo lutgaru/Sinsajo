@@ -7,9 +7,22 @@ pub const DEFINITION: ModelDefinition = ModelDefinition {
     name: "GigaAM",
     dir: "gigaam-v3-onnx",
     display: "GigaAM v3 (Russian)",
+    // The upstream repo publishes onnx-asr naming (`v3_e2e_ctc.int8.onnx`,
+    // `v3_e2e_ctc_vocab.txt`), but transcribe-rs loads `model.int8.onnx`
+    // (or `model.onnx`) plus `vocab.txt`, so the files are renamed on
+    // download via `hf_renamed`. E2E CTC is the punctuation/normalization
+    // variant that matches transcribe-rs' CTC decoding.
     files: &[
-        ModelFile { repo: Some("istupakov/gigaam-v3-onnx"), url: None, path: "model.int8.onnx" },
-        ModelFile { repo: Some("istupakov/gigaam-v3-onnx"), url: None, path: "vocab.txt" },
+        ModelFile::hf_renamed(
+            "istupakov/gigaam-v3-onnx",
+            "v3_e2e_ctc.int8.onnx",
+            "model.int8.onnx",
+        ),
+        ModelFile::hf_renamed(
+            "istupakov/gigaam-v3-onnx",
+            "v3_e2e_ctc_vocab.txt",
+            "vocab.txt",
+        ),
     ],
     archives: &[],
     executable: None,

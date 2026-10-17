@@ -9,9 +9,9 @@ use transcribe_rs::onnx::Quantization;
 //   encoder.onnx, decoder.onnx, streaming_config.json, tokenizer.json
 
 const NON_STREAMING_FILES: &[ModelFile] = &[
-    ModelFile { repo: None, url: None, path: "encoder_model.onnx" },
-    ModelFile { repo: None, url: None, path: "decoder_model_merged.onnx" },
-    ModelFile { repo: None, url: None, path: "tokenizer.json" },
+    ModelFile { repo: None, url: None, remote: None, path: "encoder_model.onnx" },
+    ModelFile { repo: None, url: None, remote: None, path: "decoder_model_merged.onnx" },
+    ModelFile { repo: None, url: None, remote: None, path: "tokenizer.json" },
 ];
 
 pub const DEFINITION_TINY: ModelDefinition = ModelDefinition {
@@ -102,10 +102,10 @@ pub const DEFINITION_STREAMING_TINY_EN: ModelDefinition = ModelDefinition {
     dir: "moonshine-tiny-streaming-en",
     display: "Moonshine Tiny Streaming (English)",
     files: &[
-        ModelFile { repo: None, url: None, path: "encoder.onnx" },
-        ModelFile { repo: None, url: None, path: "decoder.onnx" },
-        ModelFile { repo: None, url: None, path: "streaming_config.json" },
-        ModelFile { repo: None, url: None, path: "tokenizer.json" },
+        ModelFile { repo: None, url: None, remote: None, path: "encoder.onnx" },
+        ModelFile { repo: None, url: None, remote: None, path: "decoder.onnx" },
+        ModelFile { repo: None, url: None, remote: None, path: "streaming_config.json" },
+        ModelFile { repo: None, url: None, remote: None, path: "tokenizer.json" },
     ],
     archives: &[ModelArchive {
         url: "https://blob.handy.computer/moonshine-tiny-streaming-en.tar.gz",

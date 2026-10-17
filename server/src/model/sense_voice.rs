@@ -10,8 +10,8 @@ pub const DEFINITION: ModelDefinition = ModelDefinition {
     files: &[
         // Distributed as a tarball (see `archives`); place these two files
         // manually if you prefer not to use the archive mirror.
-        ModelFile { repo: None, url: None, path: "model.int8.onnx" },
-        ModelFile { repo: None, url: None, path: "tokens.txt" },
+        ModelFile::manual("model.int8.onnx"),
+        ModelFile::manual("tokens.txt"),
     ],
     archives: &[crate::model::ModelArchive {
         url: "https://blob.handy.computer/sense-voice-int8.tar.gz",

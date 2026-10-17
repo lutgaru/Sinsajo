@@ -14,16 +14,11 @@ pub const DEFINITION_SMALL: ModelDefinition = ModelDefinition {
     dir: "whisperfile-small",
     display: "Whisperfile Small (multilingual server)",
     files: &[
-        ModelFile {
-            repo: None,
-            url: Some("https://github.com/mozilla-ai/llamafile/releases/download/0.9.3/whisperfile-0.9.3"),
-            path: "whisperfile-0.9.3",
-        },
-        ModelFile {
-            repo: Some("ggerganov/whisper.cpp"),
-            url: None,
-            path: "ggml-small.bin",
-        },
+        ModelFile::direct(
+            "https://github.com/mozilla-ai/llamafile/releases/download/0.9.3/whisperfile-0.9.3",
+            "whisperfile-0.9.3",
+        ),
+        ModelFile::hf("ggerganov/whisper.cpp", "ggml-small.bin"),
     ],
     archives: &[],
     executable: Some("whisperfile-0.9.3"),

@@ -22,38 +22,78 @@ mod whisperfile;
 #[derive(Debug, Clone)]
 pub struct ModelFile {
     /// HuggingFace repo, e.g. "istupakov/canary-180m-flash-onnx".
-    /// If `None`, `url` must be `Some` (direct download).
+    /// If `None`, `url` must be `Some` (direct download) or the file must be
+    /// placed manually.
     pub repo: Option<&'static str>,
     /// Full direct URL for single-file downloads
     /// (GitHub releases, blob.handy.computer, …). Takes precedence when
     /// `repo` is `None`.
     pub url: Option<&'static str>,
-    /// Destination path relative to the model dir.
+    /// Remote filename inside `repo` when it differs from the local `path`
+    /// (e.g. upstream ships `v3_e2e_ctc.int8.onnx` but transcribe-rs loads
+    /// `model.int8.onnx`). `None` means the remote name equals `path`.
+    pub remote: Option<&'static str>,
+    /// Local destination path relative to the model dir.
     pub path: &'static str,
 }
 
 impl ModelFile {
-    #[allow(dead_code)]
+    /// HuggingFace file whose remote and local names match.
+    #[allow(dead_code)] // used behind feature gates / by some definitions
     pub const fn hf(repo: &'static str, path: &'static str) -> Self {
         Self {
             repo: Some(repo),
             url: None,
+            remote: None,
             path,
         }
     }
 
-    #[allow(dead_code)]
+    /// HuggingFace file downloaded from `remote` and saved as `path`
+    /// (used when upstream filenames differ from what transcribe-rs loads).
+    pub const fn hf_renamed(repo: &'static str, remote: &'static str, path: &'static str) -> Self {
+        Self {
+            repo: Some(repo),
+            url: None,
+            remote: Some(remote),
+            path,
+        }
+    }
+
+    /// Direct URL download saved as `path`.
+    #[allow(dead_code)] // used behind feature gates
     pub const fn direct(url: &'static str, path: &'static str) -> Self {
         Self {
             repo: None,
             url: Some(url),
+            remote: None,
             path,
         }
     }
 
+    /// File with no remote source: the user must place it manually at `path`.
+    #[allow(dead_code)]
+    pub const fn manual(path: &'static str) -> Self {
+        Self {
+            repo: None,
+            url: None,
+            remote: None,
+            path,
+        }
+    }
+
+    /// Filename used in the remote repo (falls back to the local path).
+    fn remote_name(&self) -> &str {
+        self.remote.unwrap_or(self.path)
+    }
+
     fn download_url(&self) -> Option<String> {
         if let Some(repo) = self.repo {
-            Some(format!("https://huggingface.co/{}/resolve/main/{}", repo, self.path))
+            Some(format!(
+                "https://huggingface.co/{}/resolve/main/{}",
+                repo,
+                self.remote_name()
+            ))
         } else if let Some(url) = self.url {
             Some(url.to_string())
         } else {
@@ -64,7 +104,11 @@ impl ModelFile {
 
     fn source_label(&self) -> String {
         if let Some(repo) = self.repo {
-            format!("hf:{repo}")
+            if self.remote.is_some() {
+                format!("hf:{repo} ({})", self.remote_name())
+            } else {
+                format!("hf:{repo}")
+            }
         } else if let Some(url) = self.url {
             url.to_string()
         } else {
@@ -573,5 +617,159 @@ mod tests {
         for code in ["xx", "", "english"] {
             assert!(!is_supported_language_code(code), "{code} should be rejected");
         }
+    }
+
+    // ── Download URL validation ───────────────────────────────────────────
+
+    /// Every file must resolve to exactly one sane source, and local/remote
+    /// names must be flat filenames so the manifest keys stay consistent.
+    /// This catches typos such as a file listed on a repo that never had it
+    /// (the `cohere-decoder.int8.onnx.data` 404).
+    #[test]
+    fn download_sources_are_well_formed() {
+        let mut checked = 0usize;
+        for def in MODELS {
+            assert!(!def.files.is_empty(), "{} lists no files", def.name);
+            for file in def.files {
+                assert!(
+                    file.repo.is_none() || file.url.is_none(),
+                    "{}:{} declares both repo and url",
+                    def.name,
+                    file.path
+                );
+                assert!(
+                    !file.path.is_empty() && !file.path.contains(['/', '\\']),
+                    "{}: local path '{}' must be a bare filename",
+                    def.name,
+                    file.path
+                );
+                if let Some(remote) = file.remote {
+                    assert!(
+                        !remote.is_empty() && !remote.contains(['/', '\\']),
+                        "{}: remote name '{remote}' must be a bare filename",
+                        def.name
+                    );
+                }
+
+                let Some(url) = file.download_url() else {
+                    // No source: manual placement, nothing remote to check.
+                    assert!(file.repo.is_none() && file.url.is_none());
+                    continue;
+                };
+                checked += 1;
+
+                assert!(url.starts_with("https://"), "{}: insecure url {url}", def.name);
+                assert!(
+                    !url["https://".len()..].contains("//") && !url.ends_with('/'),
+                    "{}: malformed url {url}",
+                    def.name
+                );
+
+                if let Some(repo) = file.repo {
+                    assert!(
+                        url.contains(&format!("/{repo}/resolve/main/")),
+                        "{}: HF url {url} does not reference repo {repo}",
+                        def.name
+                    );
+                    let remote = file.remote.unwrap_or(file.path);
+                    assert!(
+                        url.ends_with(&format!("/{remote}")),
+                        "{}: HF url {url} should end with /{remote}",
+                        def.name
+                    );
+                } else {
+                    assert_eq!(Some(url.as_str()), file.url, "{}: url mismatch", def.name);
+                }
+            }
+        }
+        assert!(checked > 0, "no downloadable files found");
+    }
+
+    /// The model name is the CLI selector and the dir is the on-disk folder;
+    /// both must be unique and folder-safe.
+    #[test]
+    fn model_names_and_dirs_are_unique() {
+        let mut names = HashSet::new();
+        let mut dirs = HashSet::new();
+        for def in MODELS {
+            assert!(!def.name.is_empty());
+            assert!(names.insert(def.name), "duplicate model name {}", def.name);
+            assert!(
+                !def.dir.is_empty() && !def.dir.contains(['/', '\\']),
+                "{}: dir '{}' must be a bare folder name",
+                def.name,
+                def.dir
+            );
+            assert!(dirs.insert(def.dir), "duplicate model dir {}", def.dir);
+        }
+    }
+
+    /// Local paths within one model must be distinct (manifest keys on them).
+    #[test]
+    fn model_file_paths_are_unique() {
+        for def in MODELS {
+            let mut paths = HashSet::new();
+            for file in def.files {
+                assert!(
+                    paths.insert(file.path),
+                    "{}: duplicate file path {}",
+                    def.name,
+                    file.path
+                );
+            }
+        }
+    }
+
+    /// HEAD (or a ranged GET when HEAD is unsupported) every download and
+    /// archive URL, failing on any 4xx/5xx. Ignored by default because it
+    /// needs network access: run with `cargo test -- --ignored`.
+    #[tokio::test]
+    #[ignore = "requires network access"]
+    async fn all_remote_urls_resolve() {
+        let client = Client::builder()
+            .user_agent("sinsajo-server-tests/0.1.0")
+            .build()
+            .expect("build http client");
+
+        let mut urls: Vec<(String, String)> = Vec::new();
+        for def in MODELS {
+            for file in def.files {
+                if let Some(url) = file.download_url() {
+                    urls.push((def.name.to_string(), url));
+                }
+            }
+            for archive in def.archives {
+                urls.push((def.name.to_string(), archive.url.to_string()));
+            }
+        }
+        assert!(!urls.is_empty(), "no remote urls to check");
+
+        let mut failures = Vec::new();
+        for (name, url) in &urls {
+            match probe(&client, url).await {
+                Ok(status) if status.is_success() => {}
+                Ok(status) => failures.push(format!("{name} -> {status} ({url})")),
+                Err(e) => failures.push(format!("{name} -> {e} ({url})")),
+            }
+        }
+        assert!(
+            failures.is_empty(),
+            "unreachable model URLs:\n{}",
+            failures.join("\n")
+        );
+    }
+
+    /// Some hosts reject HEAD; fall back to a one-byte ranged GET.
+    async fn probe(client: &Client, url: &str) -> Result<reqwest::StatusCode, reqwest::Error> {
+        let head = client.head(url).send().await?;
+        if matches!(head.status().as_u16(), 405 | 501) {
+            let get = client
+                .get(url)
+                .header(reqwest::header::RANGE, "bytes=0-0")
+                .send()
+                .await?;
+            return Ok(get.status());
+        }
+        Ok(head.status())
     }
 }

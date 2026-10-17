@@ -9,11 +9,7 @@ pub const DEFINITION_TINY_EN: ModelDefinition = ModelDefinition {
     name: "WhisperTinyEn",
     dir: "whisper-tiny-en",
     display: "Whisper Tiny English (fast, 75MB)",
-    files: &[ModelFile {
-        repo: Some("ggerganov/whisper.cpp"),
-        url: None,
-        path: "ggml-tiny.en.bin",
-    }],
+    files: &[ModelFile::hf("ggerganov/whisper.cpp", "ggml-tiny.en.bin")],
     archives: &[],
     executable: None,
 };
@@ -22,11 +18,7 @@ pub const DEFINITION_SMALL: ModelDefinition = ModelDefinition {
     name: "WhisperSmall",
     dir: "whisper-small",
     display: "Whisper Small (multilingual, 244MB)",
-    files: &[ModelFile {
-        repo: Some("ggerganov/whisper.cpp"),
-        url: None,
-        path: "ggml-small.bin",
-    }],
+    files: &[ModelFile::hf("ggerganov/whisper.cpp", "ggml-small.bin")],
     archives: &[],
     executable: None,
 };

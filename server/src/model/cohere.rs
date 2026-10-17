@@ -8,11 +8,11 @@ pub const DEFINITION_INT4: ModelDefinition = ModelDefinition {
     dir: "cohere-transcribe-int4-onnx",
     display: "Cohere Transcribe (int4)",
     files: &[
-        ModelFile { repo: Some("cstr/cohere-transcribe-onnx-int4"), url: None, path: "cohere-encoder.int4.onnx" },
-        ModelFile { repo: Some("cstr/cohere-transcribe-onnx-int4"), url: None, path: "cohere-encoder.int4.onnx.data" },
-        ModelFile { repo: Some("cstr/cohere-transcribe-onnx-int4"), url: None, path: "cohere-decoder.int4.onnx" },
-        ModelFile { repo: Some("cstr/cohere-transcribe-onnx-int4"), url: None, path: "cohere-decoder.int4.onnx.data" },
-        ModelFile { repo: Some("cstr/cohere-transcribe-onnx-int4"), url: None, path: "tokens.txt" },
+        ModelFile { repo: Some("cstr/cohere-transcribe-onnx-int4"), url: None, remote: None, path: "cohere-encoder.int4.onnx" },
+        ModelFile { repo: Some("cstr/cohere-transcribe-onnx-int4"), url: None, remote: None, path: "cohere-encoder.int4.onnx.data" },
+        ModelFile { repo: Some("cstr/cohere-transcribe-onnx-int4"), url: None, remote: None, path: "cohere-decoder.int4.onnx" },
+        ModelFile { repo: Some("cstr/cohere-transcribe-onnx-int4"), url: None, remote: None, path: "cohere-decoder.int4.onnx.data" },
+        ModelFile { repo: Some("cstr/cohere-transcribe-onnx-int4"), url: None, remote: None, path: "tokens.txt" },
     ],
     archives: &[],
     executable: None,
@@ -22,12 +22,15 @@ pub const DEFINITION_INT8: ModelDefinition = ModelDefinition {
     name: "CohereInt8",
     dir: "cohere-transcribe-int8-onnx",
     display: "Cohere Transcribe (int8)",
+    // Note: unlike the int4 repo, the int8 repo ships the decoder as a single
+    // self-contained file (no `cohere-decoder.int8.onnx.data`); only the
+    // encoder has a sidecar `.data`. Listing a nonexistent file here causes a
+    // 404 on download.
     files: &[
-        ModelFile { repo: Some("tristanripke/cohere-transcribe-onnx-int8"), url: None, path: "cohere-encoder.int8.onnx" },
-        ModelFile { repo: Some("tristanripke/cohere-transcribe-onnx-int8"), url: None, path: "cohere-encoder.int8.onnx.data" },
-        ModelFile { repo: Some("tristanripke/cohere-transcribe-onnx-int8"), url: None, path: "cohere-decoder.int8.onnx" },
-        ModelFile { repo: Some("tristanripke/cohere-transcribe-onnx-int8"), url: None, path: "cohere-decoder.int8.onnx.data" },
-        ModelFile { repo: Some("tristanripke/cohere-transcribe-onnx-int8"), url: None, path: "tokens.txt" },
+        ModelFile { repo: Some("tristanripke/cohere-transcribe-onnx-int8"), url: None, remote: None, path: "cohere-encoder.int8.onnx" },
+        ModelFile { repo: Some("tristanripke/cohere-transcribe-onnx-int8"), url: None, remote: None, path: "cohere-encoder.int8.onnx.data" },
+        ModelFile { repo: Some("tristanripke/cohere-transcribe-onnx-int8"), url: None, remote: None, path: "cohere-decoder.int8.onnx" },
+        ModelFile { repo: Some("tristanripke/cohere-transcribe-onnx-int8"), url: None, remote: None, path: "tokens.txt" },
     ],
     archives: &[],
     executable: None,
