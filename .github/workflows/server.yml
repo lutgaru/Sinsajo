@@ -13,10 +13,15 @@ on:
     paths:
       - 'server/**'
       - '.github/workflows/server.yml'
+  schedule:
+    # Weekly check that every model download/source URL still resolves,
+    # including the feature-gated Whisper backends.
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
 
 jobs:
   ci:
-    if: github.event_name != 'release' || startsWith(github.event.release.tag_name || '', 'server/')
+    if: github.event_name == 'push' || github.event_name == 'pull_request' || (github.event_name == 'release' && startsWith(github.event.release.tag_name || '', 'server/'))
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -36,6 +41,35 @@ jobs:
 
       - name: Test
         run: cargo test
+
+  # Guards against model sources going away (deleted repos, renamed files,
+  # 404s). Runs the `#[ignore]`d registry test that HEADs every download and
+  # archive URL. Default (ONNX) models are checked on every push/PR; the
+  # weekly run and manual dispatches additionally cover the feature-gated
+  # Whisper/Whisperfile backends.
+  model-links:
+    if: github.event_name != 'release'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: server
+
+      - name: Check model links (default features)
+        if: github.event_name != 'schedule' && github.event_name != 'workflow_dispatch'
+        run: cargo test -- --ignored
+
+      - name: Check model links (all features)
+        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+        run: cargo test --features "whisper-cpp whisperfile" -- --ignored
 
   docker:
     if: github.event_name == 'release' && startsWith(github.event.release.tag_name || '', 'server/')
