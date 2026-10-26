@@ -10,7 +10,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::SystemTime;
 use tokio::net::{TcpListener, TcpStream};
-use tokio::sync::{Mutex, Notify, Semaphore};
+use tokio::sync::{Mutex, Notify, RwLock, Semaphore};
 use tokio_tungstenite::accept_async;
 use tokio_tungstenite::tungstenite::Message;
 use vorbis_rs::VorbisEncoderBuilder;
@@ -50,6 +50,8 @@ struct ClientMessage {
     save_audio: Option<bool>,
     format: Option<String>,
     target_language: Option<String>,
+    /// Model selected by model-manager commands.
+    model: Option<String>,
 }
 
 // BCP-47 language codes accepted as output language.
@@ -120,6 +122,354 @@ impl Default for SaveSettings {
             format: AudioFormat::Wav,
         }
     }
+}
+
+// ── Runtime model management ─────────────────────────────────────────────────
+
+/// The model currently installed in memory. Model-manager commands can swap
+/// this at runtime without restarting the server.
+struct ActiveModel {
+    name: String,
+    languages: Vec<String>,
+    handle: Arc<Mutex<Box<dyn model::Model>>>,
+}
+
+/// State shared by every connection so any client can inspect and manage the
+/// server's models. Filesystem/load operations are serialized by `action_lock`
+/// to avoid two downloads or model swaps racing each other.
+#[derive(Clone)]
+struct ServerContext {
+    active: Arc<RwLock<ActiveModel>>,
+    model_dir: PathBuf,
+    action_lock: Arc<Mutex<()>>,
+}
+
+async fn send_json(write: &WsSink, value: serde_json::Value) {
+    if let Ok(json) = serde_json::to_string(&value) {
+        let mut w = write.lock().await;
+        let _ = w.send(Message::Text(json)).await;
+    }
+}
+
+async fn send_model_action(
+    write: &WsSink,
+    action: &str,
+    model: &str,
+    state: &str,
+    message: Option<String>,
+) {
+    send_json(
+        write,
+        serde_json::json!({
+            "type": "model_action",
+            "action": action,
+            "model": model,
+            "state": state,
+            "message": message,
+        }),
+    )
+    .await;
+}
+
+async fn send_model_info(write: &WsSink, ctx: &ServerContext) {
+    let active = ctx.active.read().await;
+    send_json(
+        write,
+        serde_json::json!({
+            "type": "model_info",
+            "model": &active.name,
+            "languages": &active.languages,
+        }),
+    )
+    .await;
+}
+
+async fn send_model_list(write: &WsSink, ctx: &ServerContext) {
+    let active_name = ctx.active.read().await.name.clone();
+    let models: Vec<serde_json::Value> = model::MODELS
+        .iter()
+        .map(|def| {
+            serde_json::json!({
+                "name": def.name,
+                "display": def.display,
+                "dir": def.dir,
+                "installed": model::exists(def, &ctx.model_dir),
+                "active": def.name == active_name.as_str(),
+                "files": def.files.len(),
+            })
+        })
+        .collect();
+
+    send_json(
+        write,
+        serde_json::json!({
+            "type": "model_list",
+            "active": active_name,
+            "models": models,
+        }),
+    )
+    .await;
+}
+
+async fn reject_unknown_model(write: &WsSink, action: &str, name: &str) {
+    send_model_action(
+        write,
+        action,
+        name,
+        "failed",
+        Some(format!("Unknown model '{}'", name)),
+    )
+    .await;
+}
+
+fn spawn_model_download(write: WsSink, ctx: ServerContext, name: String) {
+    tokio::spawn(async move {
+        let Some(def) = model::find(&name) else {
+            reject_unknown_model(&write, "download", &name).await;
+            return;
+        };
+
+        // One model operation at a time: a download may take minutes and we
+        // must not delete or swap a model while it is being written.
+        let _guard = ctx.action_lock.lock().await;
+
+        if model::exists(def, &ctx.model_dir) {
+            send_model_action(
+                &write,
+                "download",
+                def.name,
+                "completed",
+                Some("Model is already installed".to_string()),
+            )
+            .await;
+            send_model_list(&write, &ctx).await;
+            return;
+        }
+
+        send_model_action(&write, "download", def.name, "started", None).await;
+
+        // Preserve event ordering and avoid spawning one task per chunk:
+        // the download callback pushes into this channel and a single task
+        // forwards the messages to the client.
+        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<serde_json::Value>();
+        let progress_write = write.clone();
+        let forwarder = tokio::spawn(async move {
+            while let Some(value) = rx.recv().await {
+                send_json(&progress_write, value).await;
+            }
+        });
+
+        let model_name = def.name.to_string();
+        // (percent, bytes) last reported per file. Known-length files report
+        // every 5%; unknown-length files report every ~2 MiB.
+        let last_progress = Arc::new(std::sync::Mutex::new(
+            std::collections::HashMap::<String, (u64, u64)>::new(),
+        ));
+        let tx_progress = tx.clone();
+        let result =
+            model::download_with_progress(def, &ctx.model_dir, &move |file, downloaded, total| {
+                let percent = if total > 0 {
+                    downloaded.saturating_mul(100) / total
+                } else {
+                    0
+                };
+                let should_send = {
+                    let mut seen = last_progress
+                        .lock()
+                        .unwrap_or_else(|poisoned| poisoned.into_inner());
+                    let should_send = match seen.get(file).copied() {
+                        None => true,
+                        Some((previous_percent, previous_bytes)) => {
+                            if total > 0 {
+                                percent != previous_percent
+                                    && (percent % 5 == 0 || downloaded == total)
+                            } else {
+                                downloaded.saturating_sub(previous_bytes) >= 2 * 1024 * 1024
+                                    || downloaded == total
+                            }
+                        }
+                    };
+                    if should_send {
+                        seen.insert(file.to_string(), (percent, downloaded));
+                    }
+                    should_send
+                };
+                if should_send {
+                    let _ = tx_progress.send(serde_json::json!({
+                        "type": "model_download_progress",
+                        "model": &model_name,
+                        "file": file,
+                        "downloaded": downloaded,
+                        "total": total,
+                        "percent": percent,
+                    }));
+                }
+            })
+            .await;
+
+        drop(tx);
+        let _ = forwarder.await;
+
+        match result {
+            Ok(()) => {
+                send_model_action(&write, "download", def.name, "completed", None).await;
+            }
+            Err(e) => {
+                send_model_action(&write, "download", def.name, "failed", Some(e)).await;
+            }
+        }
+        send_model_list(&write, &ctx).await;
+    });
+}
+
+fn spawn_model_load(write: WsSink, ctx: ServerContext, name: String) {
+    tokio::spawn(async move {
+        let Some(def) = model::find(&name) else {
+            reject_unknown_model(&write, "load", &name).await;
+            return;
+        };
+
+        let _guard = ctx.action_lock.lock().await;
+
+        if !model::exists(def, &ctx.model_dir) {
+            send_model_action(
+                &write,
+                "load",
+                def.name,
+                "failed",
+                Some("Model is not installed. Download it first.".to_string()),
+            )
+            .await;
+            send_model_list(&write, &ctx).await;
+            return;
+        }
+
+        send_model_action(&write, "load", def.name, "started", None).await;
+
+        let model_name = def.name.to_string();
+        let model_path = ctx.model_dir.join(def.dir);
+        let loaded =
+            tokio::task::spawn_blocking(move || model::load_from_disk(&model_name, &model_path))
+                .await;
+
+        match loaded {
+            Ok(Ok(model)) => {
+                let name = model.name().to_string();
+                let languages: Vec<String> = model
+                    .supported_languages()
+                    .iter()
+                    .map(|s| s.to_string())
+                    .collect();
+                let handle = Arc::new(Mutex::new(model));
+
+                {
+                    let mut active = ctx.active.write().await;
+                    *active = ActiveModel {
+                        name: name.clone(),
+                        languages,
+                        handle,
+                    };
+                }
+                config::save_model(&name);
+                println!("🚀 Active model switched to {}", name);
+
+                send_model_info(&write, &ctx).await;
+                send_model_action(&write, "load", &name, "completed", None).await;
+            }
+            Ok(Err(e)) => {
+                send_model_action(
+                    &write,
+                    "load",
+                    def.name,
+                    "failed",
+                    Some(format!("Error loading model: {e}")),
+                )
+                .await;
+            }
+            Err(e) => {
+                send_model_action(
+                    &write,
+                    "load",
+                    def.name,
+                    "failed",
+                    Some(format!("Model load task failed: {e}")),
+                )
+                .await;
+            }
+        }
+
+        send_model_list(&write, &ctx).await;
+    });
+}
+
+fn spawn_model_delete(write: WsSink, ctx: ServerContext, name: String) {
+    tokio::spawn(async move {
+        let Some(def) = model::find(&name) else {
+            reject_unknown_model(&write, "delete", &name).await;
+            return;
+        };
+
+        let _guard = ctx.action_lock.lock().await;
+
+        let active_name = ctx.active.read().await.name.clone();
+        if def.name == active_name.as_str() {
+            send_model_action(
+                &write,
+                "delete",
+                def.name,
+                "failed",
+                Some("Cannot delete the active model. Load another model first.".to_string()),
+            )
+            .await;
+            return;
+        }
+
+        let dir = ctx.model_dir.join(def.dir);
+        if !dir.exists() {
+            send_model_action(
+                &write,
+                "delete",
+                def.name,
+                "completed",
+                Some("Model is not installed".to_string()),
+            )
+            .await;
+            send_model_list(&write, &ctx).await;
+            return;
+        }
+
+        send_model_action(&write, "delete", def.name, "started", None).await;
+
+        let removed = tokio::task::spawn_blocking(move || fs::remove_dir_all(&dir)).await;
+        match removed {
+            Ok(Ok(())) => {
+                println!("🗑️ Model removed: {}", def.display);
+                send_model_action(&write, "delete", def.name, "completed", None).await;
+            }
+            Ok(Err(e)) => {
+                send_model_action(
+                    &write,
+                    "delete",
+                    def.name,
+                    "failed",
+                    Some(format!("Could not delete model: {e}")),
+                )
+                .await;
+            }
+            Err(e) => {
+                send_model_action(
+                    &write,
+                    "delete",
+                    def.name,
+                    "failed",
+                    Some(format!("Delete task failed: {e}")),
+                )
+                .await;
+            }
+        }
+
+        send_model_list(&write, &ctx).await;
+    });
 }
 
 async fn send_msg(write: &WsSink, msg: ServerMessage) {
@@ -242,7 +592,7 @@ async fn transcribe_and_send(
 async fn handle_connection(
     stream: TcpStream,
     addr: SocketAddr,
-    model: Arc<Mutex<Box<dyn model::Model>>>,
+    ctx: ServerContext,
     sem: Arc<Semaphore>,
     shutdown: Arc<Notify>,
     records_dir: PathBuf,
@@ -263,18 +613,7 @@ async fn handle_connection(
 
     // Announce the loaded model and its supported languages so the client can
     // show it in the UI and enable only the language options that work.
-    {
-        let m = model.lock().await;
-        let json = serde_json::json!({
-            "type": "model_info",
-            "model": m.name(),
-            "languages": m.supported_languages(),
-        });
-        if let Ok(s) = serde_json::to_string(&json) {
-            let mut w = write.lock().await;
-            let _ = w.send(Message::Text(s)).await;
-        }
-    }
+    send_model_info(&write, &ctx).await;
 
     let _ = fs::create_dir_all(&records_dir);
     let mut audio_buffer: Vec<f32> = Vec::new();
@@ -313,10 +652,7 @@ async fn handle_connection(
                                     }
                                 }
                                 if let Some(lang) = &client_msg.target_language {
-                                    let supported: Vec<String> = {
-                                        let m = model.lock().await;
-                                        m.supported_languages().iter().map(|s| s.to_string()).collect()
-                                    };
+                                    let supported = ctx.active.read().await.languages.clone();
                                     let supported_ref: Vec<&str> =
                                         supported.iter().map(|s| s.as_str()).collect();
                                     session_target_language =
@@ -359,6 +695,62 @@ async fn handle_connection(
                                     message: Some("cleaned".to_string()),
                                 }).await;
                             }
+
+                            // ── Model manager ─────────────────────────────
+                            "list_models" => {
+                                send_model_list(&write, &ctx).await;
+                            }
+                            "download_model" => {
+                                match client_msg.model {
+                                    Some(name) => {
+                                        spawn_model_download(Arc::clone(&write), ctx.clone(), name)
+                                    }
+                                    None => {
+                                        send_model_action(
+                                            &write,
+                                            "download",
+                                            "",
+                                            "failed",
+                                            Some("Missing model name".to_string()),
+                                        )
+                                        .await;
+                                    }
+                                }
+                            }
+                            "load_model" | "reload_model" => {
+                                match client_msg.model {
+                                    Some(name) => {
+                                        spawn_model_load(Arc::clone(&write), ctx.clone(), name)
+                                    }
+                                    None => {
+                                        send_model_action(
+                                            &write,
+                                            "load",
+                                            "",
+                                            "failed",
+                                            Some("Missing model name".to_string()),
+                                        )
+                                        .await;
+                                    }
+                                }
+                            }
+                            "delete_model" => {
+                                match client_msg.model {
+                                    Some(name) => {
+                                        spawn_model_delete(Arc::clone(&write), ctx.clone(), name)
+                                    }
+                                    None => {
+                                        send_model_action(
+                                            &write,
+                                            "delete",
+                                            "",
+                                            "failed",
+                                            Some("Missing model name".to_string()),
+                                        )
+                                        .await;
+                                    }
+                                }
+                            }
                             _ => {}
                         }
                     }
@@ -387,7 +779,10 @@ async fn handle_connection(
                         // processes the chunk, we keep receiving audio.
                         // Semaphore(1) ensures only one inference runs
                         // at a time (avoids OOM and out-of-order results).
-                        let model_clone = Arc::clone(&model);
+                        // Snapshot the active model handle: if the model is
+                        // swapped while this chunk is in flight, it still
+                        // completes with the model it started with.
+                        let model_clone = ctx.active.read().await.handle.clone();
                         let sem_clone   = Arc::clone(&sem);
                         let write_clone = Arc::clone(&write);
                         let target_clone = session_target_language.clone();
@@ -475,15 +870,31 @@ async fn main() {
 
     let model_path = args.model_dir.join(model_info.dir);
 
-    let model: Arc<Mutex<Box<dyn model::Model>>> = match model::load_from_disk(&model_name, &model_path) {
+    let model = match model::load_from_disk(&model_name, &model_path) {
         Ok(m) => {
             println!("🚀 Loaded {} model", m.name());
-            Arc::new(Mutex::new(m))
+            m
         }
         Err(e) => {
             eprintln!("❌ Error loading model: {}", e);
             return;
         }
+    };
+
+    let active_name = model.name().to_string();
+    let active_languages: Vec<String> = model
+        .supported_languages()
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
+    let ctx = ServerContext {
+        active: Arc::new(RwLock::new(ActiveModel {
+            name: active_name,
+            languages: active_languages,
+            handle: Arc::new(Mutex::new(model)),
+        })),
+        model_dir: args.model_dir.clone(),
+        action_lock: Arc::new(Mutex::new(())),
     };
 
     println!("✅ Model loaded");
@@ -513,7 +924,7 @@ async fn main() {
                         tokio::spawn(handle_connection(
                             stream,
                             addr,
-                            Arc::clone(&model),
+                            ctx.clone(),
                             Arc::clone(&semaphore),
                             Arc::clone(&shutdown),
                             args.records_dir.clone(),
@@ -603,6 +1014,25 @@ mod tests {
         let msg: ClientMessage = serde_json::from_str(r#"{"type":"start"}"#).unwrap();
         assert_eq!(msg.msg_type, "start");
         assert_eq!(msg.target_language, None);
+    }
+
+    #[test]
+    fn model_manager_messages_parse_model_name() {
+        for action in [
+            "download_model",
+            "load_model",
+            "reload_model",
+            "delete_model",
+        ] {
+            let json = format!(r#"{{"type":"{action}","model":"Canary180M"}}"#);
+            let msg: ClientMessage = serde_json::from_str(&json).unwrap();
+            assert_eq!(msg.msg_type, action);
+            assert_eq!(msg.model.as_deref(), Some("Canary180M"));
+        }
+
+        let msg: ClientMessage = serde_json::from_str(r#"{"type":"list_models"}"#).unwrap();
+        assert_eq!(msg.msg_type, "list_models");
+        assert_eq!(msg.model, None);
     }
 
     #[test]

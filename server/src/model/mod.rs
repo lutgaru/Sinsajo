@@ -191,6 +191,18 @@ fn gated_feature_for(name: &str) -> Option<&'static str> {
         .map(|(_, feature)| *feature)
 }
 
+/// Look up a model without terminating the process on failure.
+///
+/// Client-supplied names (model manager commands) must use this instead of
+/// [`get_model_info`], which exits on unknown models for CLI convenience.
+pub fn find(name: &str) -> Option<&'static ModelDefinition> {
+    MODELS
+        .iter()
+        .find(|m| m.name == name)
+        .or_else(|| MODELS.iter().find(|m| m.name.eq_ignore_ascii_case(name)))
+        .copied()
+}
+
 pub fn get_model_info(name: &str) -> &'static ModelDefinition {
     if let Some(def) = MODELS.iter().find(|m| m.name == name).copied() {
         return def;
@@ -344,12 +356,41 @@ pub fn verify(definition: &ModelDefinition, model_dir: &Path) -> Result<(), Vec<
     }
 }
 
+/// Progress callback used by remote model-manager downloads:
+/// `(file name, bytes downloaded for that file, total bytes for that file)`.
+pub type DownloadProgressFn<'a> = &'a (dyn Fn(&str, u64, u64) + Send + Sync);
+
+/// CLI entry point: downloads (or prompts) and exits with an error message on
+/// failure. Remote model-manager downloads use [`download_with_progress`],
+/// which never terminates the server process.
 pub async fn download(definition: &ModelDefinition, model_dir: &Path, auto_download: bool) {
-    let target_dir = PathBuf::from(model_dir).join(definition.dir);
+    if let Err(e) = download_inner(definition, model_dir, auto_download, None).await {
+        eprintln!("❌ {}", e);
+        std::process::exit(1);
+    }
+}
+
+/// Installs a model without prompting or exiting the process, reporting
+/// per-file progress so the client can display it.
+pub async fn download_with_progress(
+    definition: &ModelDefinition,
+    model_dir: &Path,
+    progress: DownloadProgressFn<'_>,
+) -> Result<(), String> {
+    download_inner(definition, model_dir, true, Some(progress)).await
+}
+
+async fn download_inner(
+    definition: &ModelDefinition,
+    model_dir: &Path,
+    auto_download: bool,
+    progress: Option<DownloadProgressFn<'_>>,
+) -> Result<(), String> {
+    let target_dir = model_dir.join(definition.dir);
 
     if exists(definition, model_dir) {
         println!("✓ Model '{}' found in '{}'", definition.display, definition.dir);
-        return;
+        return Ok(());
     }
 
     if auto_download {
@@ -357,17 +398,19 @@ pub async fn download(definition: &ModelDefinition, model_dir: &Path, auto_downl
     } else {
         println!("⚠ Model '{}' not found in '{}'", definition.display, definition.dir);
         print!("Download model automatically? (y/N): ");
-        std::io::stdout().flush().unwrap();
+        std::io::stdout().flush().map_err(|e| e.to_string())?;
         let mut input = String::new();
-        std::io::stdin().read_line(&mut input).unwrap();
+        std::io::stdin()
+            .read_line(&mut input)
+            .map_err(|e| e.to_string())?;
         if input.trim().to_lowercase() != "y" {
-            eprintln!("❌ Download cancelled. Exiting.");
-            std::process::exit(1);
+            return Err("Download cancelled.".to_string());
         }
         println!("📥 Downloading model...");
     }
 
-    fs::create_dir_all(&target_dir).expect("Failed to create model directory");
+    fs::create_dir_all(&target_dir)
+        .map_err(|e| format!("Failed to create model directory: {e}"))?;
 
     let mut manifest = load_manifest(&target_dir);
 
@@ -386,7 +429,7 @@ pub async fn download(definition: &ModelDefinition, model_dir: &Path, auto_downl
     let client = Client::builder()
         .user_agent("sinsajo-server/0.1.0")
         .build()
-        .expect("Failed to build HTTP client");
+        .map_err(|e| format!("Failed to build HTTP client: {e}"))?;
 
     for file in definition.files {
         // skip if already in manifest and exists on disk
@@ -403,7 +446,8 @@ pub async fn download(definition: &ModelDefinition, model_dir: &Path, auto_downl
 
         let file_path = target_dir.join(file.path);
         if let Some(parent) = file_path.parent() {
-            fs::create_dir_all(parent).expect("Failed to create parent directory");
+            fs::create_dir_all(parent)
+                .map_err(|e| format!("Failed to create parent directory: {e}"))?;
         }
 
         let file_url = match file.download_url() {
@@ -415,11 +459,14 @@ pub async fn download(definition: &ModelDefinition, model_dir: &Path, auto_downl
         };
         println!("  📥 {}", file.path);
 
-        if let Err(e) = download_file(&client, &file_url, &file_path).await {
-            eprintln!("  ❌ Error downloading {}: {}", file.path, e);
-            eprintln!("  Run again to resume download");
-            std::process::exit(1);
-        }
+        download_file(&client, &file_url, &file_path, file.path, progress)
+            .await
+            .map_err(|e| {
+                format!(
+                    "Error downloading {}: {e}. Run the download again to resume.",
+                    file.path
+                )
+            })?;
 
         add_to_manifest(&target_dir, &mut manifest, file.path);
     }
@@ -434,10 +481,9 @@ pub async fn download(definition: &ModelDefinition, model_dir: &Path, auto_downl
     if has_missing {
         if let Some(archive) = definition.archives.first() {
             println!("  📦 Fetching archive {}", archive.url);
-            if let Err(e) = download_and_extract(&client, archive.url, &target_dir).await {
-                eprintln!("  ❌ Error extracting archive: {}", e);
-                std::process::exit(1);
-            }
+            download_and_extract(&client, archive.url, &target_dir)
+                .await
+                .map_err(|e| format!("Error extracting archive: {e}"))?;
             for file in definition.files {
                 if target_dir.join(file.path).exists() {
                     add_to_manifest(&target_dir, &mut manifest, file.path);
@@ -449,12 +495,11 @@ pub async fn download(definition: &ModelDefinition, model_dir: &Path, auto_downl
                 .iter()
                 .filter(|f| !target_dir.join(f.path).exists())
                 .count();
-            eprintln!(
-                "  ❌ {} file(s) have no remote source. Place them manually in '{}' and re-run.",
+            return Err(format!(
+                "{} file(s) have no remote source. Place them manually in '{}' and retry.",
                 missing_count,
                 target_dir.display()
-            );
-            std::process::exit(1);
+            ));
         }
     }
 
@@ -468,9 +513,16 @@ pub async fn download(definition: &ModelDefinition, model_dir: &Path, auto_downl
     }
 
     println!("✅ Model '{}' downloaded successfully to '{}'", definition.display, definition.dir);
+    Ok(())
 }
 
-async fn download_file(client: &Client, url: &str, dest: &Path) -> Result<(), Box<dyn std::error::Error>> {
+async fn download_file(
+    client: &Client,
+    url: &str,
+    dest: &Path,
+    label: &str,
+    progress: Option<DownloadProgressFn<'_>>,
+) -> Result<(), Box<dyn std::error::Error>> {
     let response = client.get(url).send().await?;
     if !response.status().is_success() {
         return Err(format!("HTTP {} for {}", response.status(), url).into());
@@ -497,12 +549,17 @@ async fn download_file(client: &Client, url: &str, dest: &Path) -> Result<(), Bo
     };
 
     let mut file_content = Vec::new();
+    let mut downloaded = 0u64;
     let mut stream = response.bytes_stream();
 
     while let Some(chunk) = stream.next().await {
         let chunk = chunk?;
         file_content.extend_from_slice(&chunk);
+        downloaded += chunk.len() as u64;
         pb.inc(chunk.len() as u64);
+        if let Some(cb) = progress {
+            cb(label, downloaded, file_size);
+        }
     }
 
     pb.finish_and_clear();
@@ -592,6 +649,13 @@ mod tests {
         ] {
             assert!(names.contains(&expected), "missing model {expected}");
         }
+    }
+
+    #[test]
+    fn find_is_optional_and_case_insensitive() {
+        assert!(find("NoSuchModel").is_none());
+        assert_eq!(find("Canary180M").map(|m| m.name), Some("Canary180M"));
+        assert_eq!(find("canary180m").map(|m| m.name), Some("Canary180M"));
     }
 
     #[test]

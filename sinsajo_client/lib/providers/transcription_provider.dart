@@ -141,8 +141,19 @@ class TranscriptionNotifier extends Notifier<TranscriptionState> {
     return const TranscriptionState();
   }
 
+  /// Shared WebSocket used by the session and the server model manager.
+  WsService get ws => _ws;
+
   Future<void> connect() async {
     await _ws.connect();
+  }
+
+  /// Applies the current Server IP setting and reconnects. Safe to call while
+  /// idle; recording sessions resume automatically after reconnecting.
+  Future<void> applyServerAddress() async {
+    final settings = ref.read(settingsProvider);
+    _ws.updateUrl('ws://${settings.ipAddress}:8765');
+    await _ws.reconnect();
   }
 
   Future<void> reconnectIfNeeded() async {

@@ -211,6 +211,22 @@ void main() {
 
       expect(msg.model, isNull);
       expect(msg.languages, isNull);
+      expect(msg.data, isEmpty);
+    });
+
+    test('stores the full decoded payload', () {
+      final msg = WsMessage(
+        'model_download_progress',
+        '',
+        data: const {
+          'model': 'Canary180M',
+          'file': 'model.onnx',
+          'percent': 42,
+        },
+      );
+
+      expect(msg.data['file'], 'model.onnx');
+      expect(msg.data['percent'], 42);
     });
   });
 
