@@ -828,6 +828,55 @@ class _ActionBanner extends StatelessWidget {
   }
 }
 
+/// Progress bar split into one segment per file still to download.
+class _SegmentedProgressBar extends StatelessWidget {
+  const _SegmentedProgressBar({required this.segments, required this.value});
+
+  /// Number of file sections. Values <= 1 fall back to a normal bar.
+  final int segments;
+
+  /// Overall completion in the range 0..1, or null for an indeterminate bar.
+  final double? value;
+
+  @override
+  Widget build(BuildContext context) {
+    final trackColor = Theme.of(context).colorScheme.outlineVariant;
+    final shownValue = value;
+
+    if (shownValue == null || segments <= 1) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(4),
+        child: LinearProgressIndicator(
+          value: shownValue,
+          minHeight: 8,
+          backgroundColor: trackColor,
+        ),
+      );
+    }
+
+    // Every file owns the same slice of the bar. `filled` counts how many
+    // sections are complete (including the partially filled current one).
+    final filled = shownValue.clamp(0.0, 1.0).toDouble() * segments;
+    return Row(
+      children: [
+        for (var index = 0; index < segments; index++) ...[
+          if (index > 0) const SizedBox(width: 3),
+          Expanded(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(3),
+              child: LinearProgressIndicator(
+                value: (filled - index).clamp(0.0, 1.0).toDouble(),
+                minHeight: 8,
+                backgroundColor: trackColor,
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
 class _ModelCard extends StatelessWidget {
   const _ModelCard({
     required this.model,
@@ -931,12 +980,20 @@ class _ModelCard extends StatelessWidget {
           ),
           if (isThisDownloading) ...[
             const SizedBox(height: 12),
-            LinearProgressIndicator(
-              value: state.totalBytes > 0
-                  ? (state.downloadPercent / 100).clamp(0.0, 1.0)
+            _SegmentedProgressBar(
+              segments: state.downloadFilesTotal,
+              value: (state.totalBytes > 0 || state.downloadFilesTotal > 0)
+                  ? state.downloadFraction
                   : null,
             ),
             const SizedBox(height: 6),
+            Text(
+              state.downloadFile == null
+                  ? 'Downloading model…'
+                  : 'Downloading ${state.downloadFile}',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(height: 2),
             Text(
               _downloadLabel(state),
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -1004,13 +1061,16 @@ class _ModelCard extends StatelessWidget {
   }
 
   static String _downloadLabel(ServerModelsState state) {
-    final percent = state.downloadPercent;
-    final file = state.downloadFile ?? 'download';
+    final downloaded = _formatBytes(state.downloadedBytes);
+    final fileCount = state.downloadFilesTotal > 1
+        ? ' • file ${(state.downloadFilesDone + 1).clamp(1, state.downloadFilesTotal)}'
+              ' of ${state.downloadFilesTotal}'
+        : '';
     if (state.totalBytes <= 0) {
-      return '$file • ${_formatBytes(state.downloadedBytes)}';
+      return '$downloaded downloaded$fileCount';
     }
-    return '$file • $percent% '
-        '(${_formatBytes(state.downloadedBytes)} / ${_formatBytes(state.totalBytes)})';
+    final percent = state.downloadPercent.clamp(0, 100);
+    return '$percent% • $downloaded / ${_formatBytes(state.totalBytes)}$fileCount';
   }
 
   static String _formatBytes(int bytes) {

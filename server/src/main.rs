@@ -222,6 +222,48 @@ async fn reject_unknown_model(write: &WsSink, action: &str, name: &str) {
     .await;
 }
 
+/// Throttles aggregate download progress so we send at most one message per
+/// percent, per file boundary, and at least every MiB when sizes are unknown.
+#[derive(Default)]
+struct DownloadProgressThrottle {
+    file: String,
+    percent: u64,
+    file_percent: u64,
+    downloaded: u64,
+    files_done: usize,
+}
+
+impl DownloadProgressThrottle {
+    fn should_emit(&mut self, progress: &model::DownloadProgress<'_>) -> bool {
+        let percent = progress.percent();
+        let file_percent = if progress.file_complete {
+            100
+        } else {
+            progress
+                .file_downloaded
+                .saturating_mul(100)
+                .checked_div(progress.file_total)
+                .unwrap_or(0)
+                .min(100)
+        };
+        let emit = self.file != progress.file
+            || self.percent != percent
+            || self.file_percent != file_percent
+            || self.files_done != progress.files_done
+            || (progress.file_total == 0
+                && progress.downloaded.saturating_sub(self.downloaded) >= 1024 * 1024);
+        if emit {
+            self.file.clear();
+            self.file.push_str(progress.file);
+            self.percent = percent;
+            self.file_percent = file_percent;
+            self.downloaded = progress.downloaded;
+            self.files_done = progress.files_done;
+        }
+        emit
+    }
+}
+
 fn spawn_model_download(write: WsSink, ctx: ServerContext, name: String) {
     tokio::spawn(async move {
         let Some(def) = model::find(&name) else {
@@ -260,52 +302,32 @@ fn spawn_model_download(write: WsSink, ctx: ServerContext, name: String) {
         });
 
         let model_name = def.name.to_string();
-        // (percent, bytes) last reported per file. Known-length files report
-        // every 5%; unknown-length files report every ~2 MiB.
-        let last_progress = Arc::new(std::sync::Mutex::new(
-            std::collections::HashMap::<String, (u64, u64)>::new(),
-        ));
+        let throttle = Arc::new(std::sync::Mutex::new(DownloadProgressThrottle::default()));
         let tx_progress = tx.clone();
-        let result =
-            model::download_with_progress(def, &ctx.model_dir, &move |file, downloaded, total| {
-                let percent = if total > 0 {
-                    downloaded.saturating_mul(100) / total
-                } else {
-                    0
-                };
-                let should_send = {
-                    let mut seen = last_progress
-                        .lock()
-                        .unwrap_or_else(|poisoned| poisoned.into_inner());
-                    let should_send = match seen.get(file).copied() {
-                        None => true,
-                        Some((previous_percent, previous_bytes)) => {
-                            if total > 0 {
-                                percent != previous_percent
-                                    && (percent % 5 == 0 || downloaded == total)
-                            } else {
-                                downloaded.saturating_sub(previous_bytes) >= 2 * 1024 * 1024
-                                    || downloaded == total
-                            }
-                        }
-                    };
-                    if should_send {
-                        seen.insert(file.to_string(), (percent, downloaded));
-                    }
-                    should_send
-                };
-                if should_send {
-                    let _ = tx_progress.send(serde_json::json!({
-                        "type": "model_download_progress",
-                        "model": &model_name,
-                        "file": file,
-                        "downloaded": downloaded,
-                        "total": total,
-                        "percent": percent,
-                    }));
-                }
-            })
-            .await;
+        let result = model::download_with_progress(def, &ctx.model_dir, &move |progress| {
+            let should_send = {
+                let mut throttle = throttle
+                    .lock()
+                    .unwrap_or_else(|poisoned| poisoned.into_inner());
+                throttle.should_emit(&progress)
+            };
+            if should_send {
+                let _ = tx_progress.send(serde_json::json!({
+                    "type": "model_download_progress",
+                    "model": &model_name,
+                    "file": progress.file,
+                    "file_downloaded": progress.file_downloaded,
+                    "file_total": progress.file_total,
+                    "file_complete": progress.file_complete,
+                    "downloaded": progress.downloaded,
+                    "total": progress.total,
+                    "percent": progress.percent(),
+                    "files_done": progress.files_done,
+                    "files_total": progress.files_total,
+                }));
+            }
+        })
+        .await;
 
         drop(tx);
         let _ = forwarder.await;

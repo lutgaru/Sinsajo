@@ -5,6 +5,7 @@ use std::collections::HashSet;
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::time::Duration;
 
 mod canary;
 mod cohere;
@@ -356,9 +357,61 @@ pub fn verify(definition: &ModelDefinition, model_dir: &Path) -> Result<(), Vec<
     }
 }
 
-/// Progress callback used by remote model-manager downloads:
-/// `(file name, bytes downloaded for that file, total bytes for that file)`.
-pub type DownloadProgressFn<'a> = &'a (dyn Fn(&str, u64, u64) + Send + Sync);
+/// Snapshot of an in-progress model install.
+///
+/// `downloaded`/`total` are aggregate byte counters for the whole model.
+/// [`DownloadProgress::percent`] weights every file equally so clients can
+/// render one section per file and the bar never moves backwards.
+/// The per-file fields describe the file currently being fetched.
+pub struct DownloadProgress<'a> {
+    /// File currently being fetched.
+    pub file: &'a str,
+    /// Bytes downloaded for `file`.
+    pub file_downloaded: u64,
+    /// Expected size of `file` (0 when unknown).
+    pub file_total: u64,
+    /// Bytes downloaded across the whole model (completed files + current).
+    pub downloaded: u64,
+    /// Expected bytes for every file still to fetch (0 when unknown).
+    pub total: u64,
+    /// Files finished before the current file.
+    pub files_done: usize,
+    /// Files to fetch for this model (excludes already-installed files).
+    pub files_total: usize,
+    /// True for the final snapshot of the current file. Lets the aggregate
+    /// percentage advance even when the file size is unknown.
+    pub file_complete: bool,
+}
+
+impl DownloadProgress<'_> {
+    /// Aggregate completion as an integer percentage (0..=100).
+    ///
+    /// Every file owns an equal slice of the bar. This keeps the bar monotonic
+    /// even when file sizes differ wildly, and lets the client render one
+    /// section per file.
+    pub fn percent(&self) -> u64 {
+        if self.files_total == 0 {
+            return 0;
+        }
+        if self.files_done >= self.files_total {
+            return 100;
+        }
+        let file_percent = if self.file_complete {
+            100
+        } else {
+            self.file_downloaded
+                .saturating_mul(100)
+                .checked_div(self.file_total)
+                .unwrap_or(0)
+                .min(100)
+        };
+        let done = self.files_done.min(self.files_total) as u64;
+        ((done * 100 + file_percent) / self.files_total as u64).min(100)
+    }
+}
+
+/// Progress callback used by remote model-manager downloads.
+pub type DownloadProgressFn<'a> = &'a (dyn Fn(DownloadProgress<'_>) + Send + Sync);
 
 /// CLI entry point: downloads (or prompts) and exits with an error message on
 /// failure. Remote model-manager downloads use [`download_with_progress`],
@@ -431,6 +484,10 @@ async fn download_inner(
         .build()
         .map_err(|e| format!("Failed to build HTTP client: {e}"))?;
 
+    // Resolve every file that still has to be fetched before starting so the
+    // client can show one progress bar for the whole model. HEAD requests give
+    // the total size without downloading the bodies.
+    let mut pending: Vec<(&ModelFile, String)> = Vec::new();
     for file in definition.files {
         // skip if already in manifest and exists on disk
         if manifest.contains(file.path) && target_dir.join(file.path).exists() {
@@ -443,31 +500,76 @@ async fn download_inner(
             add_to_manifest(&target_dir, &mut manifest, file.path);
             continue;
         }
+        match file.download_url() {
+            Some(url) => pending.push((file, url)),
+            None => {
+                println!("  ⚠ {} has no remote source — place it manually", file.path);
+            }
+        }
+    }
 
+    // The CLI has its own per-file bar and does not need an aggregate total;
+    // only the remote model manager asks for progress.
+    let sizes = if progress.is_some() {
+        futures_util::future::join_all(
+            pending
+                .iter()
+                .map(|(_, url)| remote_size(&client, url.as_str())),
+        )
+        .await
+    } else {
+        vec![None; pending.len()]
+    };
+    let planned_total: u64 = sizes.iter().copied().flatten().sum();
+    let files_total = pending.len();
+    let mut completed_bytes = 0u64;
+
+    // Announce the plan (file count and total size) before the first chunk so
+    // the client can switch from an indeterminate to a determinate bar.
+    if let (Some((file, _)), Some(expected_size)) = (pending.first(), sizes.first()) {
+        if let Some(cb) = progress {
+            cb(DownloadProgress {
+                file: file.path,
+                file_downloaded: 0,
+                file_total: expected_size.unwrap_or(0),
+                downloaded: 0,
+                total: planned_total,
+                files_done: 0,
+                files_total,
+                file_complete: false,
+            });
+        }
+    }
+
+    for (index, ((file, url), expected_size)) in pending.iter().zip(sizes).enumerate() {
         let file_path = target_dir.join(file.path);
         if let Some(parent) = file_path.parent() {
             fs::create_dir_all(parent)
                 .map_err(|e| format!("Failed to create parent directory: {e}"))?;
         }
-
-        let file_url = match file.download_url() {
-            Some(u) => u,
-            None => {
-                println!("  ⚠ {} has no remote source — place it manually", file.path);
-                continue;
-            }
-        };
         println!("  📥 {}", file.path);
 
-        download_file(&client, &file_url, &file_path, file.path, progress)
-            .await
-            .map_err(|e| {
-                format!(
-                    "Error downloading {}: {e}. Run the download again to resume.",
-                    file.path
-                )
-            })?;
+        let downloaded = download_file(
+            &client,
+            url,
+            &file_path,
+            file.path,
+            expected_size.unwrap_or(0),
+            completed_bytes,
+            planned_total,
+            index,
+            files_total,
+            progress,
+        )
+        .await
+        .map_err(|e| {
+            format!(
+                "Error downloading {}: {e}. Run the download again to resume.",
+                file.path
+            )
+        })?;
 
+        completed_bytes = completed_bytes.saturating_add(downloaded);
         add_to_manifest(&target_dir, &mut manifest, file.path);
     }
 
@@ -516,18 +618,62 @@ async fn download_inner(
     Ok(())
 }
 
+/// Best-effort size lookup used to build the aggregate download total before
+/// the first byte is fetched. Never downloads a full body.
+async fn remote_size(client: &Client, url: &str) -> Option<u64> {
+    // HEAD is cheap and every current model host supports it. Some CDNs
+    // answer without Content-Length, so fall back to a one-byte ranged GET
+    // which reports the complete size in Content-Range.
+    if let Ok(response) = client.head(url).timeout(Duration::from_secs(10)).send().await {
+        if response.status().is_success() {
+            if let Some(size) = response.content_length() {
+                return Some(size);
+            }
+        }
+    }
+
+    let response = client
+        .get(url)
+        .header(reqwest::header::RANGE, "bytes=0-0")
+        .timeout(Duration::from_secs(10))
+        .send()
+        .await
+        .ok()?;
+    if response.status() == reqwest::StatusCode::PARTIAL_CONTENT {
+        let value = response
+            .headers()
+            .get(reqwest::header::CONTENT_RANGE)?
+            .to_str()
+            .ok()?;
+        return value.rsplit('/').next()?.trim().parse().ok();
+    }
+    // Host ignored Range: it still told us the full size in Content-Length.
+    response.content_length().filter(|size| *size > 0)
+}
+
+#[allow(clippy::too_many_arguments)]
 async fn download_file(
     client: &Client,
     url: &str,
     dest: &Path,
     label: &str,
+    expected_size: u64,
+    completed_bytes: u64,
+    planned_total: u64,
+    files_done: usize,
+    files_total: usize,
     progress: Option<DownloadProgressFn<'_>>,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<u64, Box<dyn std::error::Error>> {
     let response = client.get(url).send().await?;
     if !response.status().is_success() {
         return Err(format!("HTTP {} for {}", response.status(), url).into());
     }
-    let file_size = response.content_length().unwrap_or(0);
+    let response_size = response.content_length().unwrap_or(0);
+    let file_size = if response_size > 0 {
+        response_size
+    } else {
+        expected_size
+    };
 
     let pb = if file_size > 0 {
         let pb = ProgressBar::new(file_size);
@@ -558,13 +704,40 @@ async fn download_file(
         downloaded += chunk.len() as u64;
         pb.inc(chunk.len() as u64);
         if let Some(cb) = progress {
-            cb(label, downloaded, file_size);
+            cb(DownloadProgress {
+                file: label,
+                file_downloaded: downloaded,
+                file_total: file_size,
+                downloaded: completed_bytes.saturating_add(downloaded),
+                total: planned_total,
+                files_done,
+                files_total,
+                file_complete: false,
+            });
         }
     }
 
     pb.finish_and_clear();
     fs::write(dest, &file_content)?;
-    Ok(())
+
+    // Emit a final snapshot for this file. `files_done` is not incremented
+    // here: it counts files finished *before* the current one, and the next
+    // file's first snapshot will advance it. This keeps the aggregate
+    // percentage monotonic.
+    if let Some(cb) = progress {
+        cb(DownloadProgress {
+            file: label,
+            file_downloaded: downloaded,
+            file_total: file_size,
+            downloaded: completed_bytes.saturating_add(downloaded),
+            total: planned_total,
+            files_done,
+            files_total,
+            file_complete: true,
+        });
+    }
+
+    Ok(downloaded)
 }
 
 async fn download_and_extract(
@@ -835,5 +1008,106 @@ mod tests {
             return Ok(get.status());
         }
         Ok(head.status())
+    }
+
+    #[test]
+    fn aggregate_progress_gives_every_file_an_equal_section() {
+        // Two files: the first one is half downloaded.
+        let first = DownloadProgress {
+            file: "encoder.onnx",
+            file_downloaded: 50,
+            file_total: 100,
+            downloaded: 50,
+            total: 200,
+            files_done: 0,
+            files_total: 2,
+            file_complete: false,
+        };
+        assert_eq!(first.percent(), 25);
+
+        // First file complete, second one half downloaded.
+        let second = DownloadProgress {
+            file: "decoder.onnx",
+            file_downloaded: 50,
+            file_total: 100,
+            downloaded: 150,
+            total: 200,
+            files_done: 1,
+            files_total: 2,
+            file_complete: false,
+        };
+        assert_eq!(second.percent(), 75);
+    }
+
+    #[test]
+    fn aggregate_progress_does_not_drop_between_files() {
+        // Last snapshot of the first file and the first snapshot of the second
+        // file must report the same percentage.
+        let completed = DownloadProgress {
+            file: "first.onnx",
+            file_downloaded: 100,
+            file_total: 100,
+            downloaded: 100,
+            total: 200,
+            files_done: 0,
+            files_total: 2,
+            file_complete: true,
+        };
+        let next = DownloadProgress {
+            file: "second.onnx",
+            file_downloaded: 0,
+            file_total: 100,
+            downloaded: 100,
+            total: 200,
+            files_done: 1,
+            files_total: 2,
+            file_complete: false,
+        };
+        assert_eq!(completed.percent(), 50);
+        assert_eq!(next.percent(), 50);
+    }
+
+    #[test]
+    fn aggregate_progress_is_full_when_all_files_finish() {
+        let progress = DownloadProgress {
+            file: "decoder.onnx",
+            file_downloaded: 50,
+            file_total: 50,
+            downloaded: 100,
+            total: 100,
+            files_done: 2,
+            files_total: 2,
+            file_complete: true,
+        };
+        assert_eq!(progress.percent(), 100);
+    }
+
+    #[test]
+    fn aggregate_progress_handles_unknown_file_size() {
+        // Unknown file size: the current section stays empty until the file
+        // completes, but completed files still advance the bar.
+        let progress = DownloadProgress {
+            file: "encoder.onnx",
+            file_downloaded: 50,
+            file_total: 0,
+            downloaded: 50,
+            total: 0,
+            files_done: 1,
+            files_total: 4,
+            file_complete: false,
+        };
+        assert_eq!(progress.percent(), 25);
+
+        let completed = DownloadProgress {
+            file: "encoder.onnx",
+            file_downloaded: 50,
+            file_total: 0,
+            downloaded: 50,
+            total: 0,
+            files_done: 1,
+            files_total: 4,
+            file_complete: true,
+        };
+        assert_eq!(completed.percent(), 50);
     }
 }

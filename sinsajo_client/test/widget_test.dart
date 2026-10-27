@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:sinsajo_client/main.dart';
 import 'package:sinsajo_client/screens/transcription_screen.dart';
 import 'package:sinsajo_client/providers/transcription_provider.dart';
+import 'package:sinsajo_client/providers/server_models_provider.dart';
 import 'package:sinsajo_client/services/ws_service.dart';
 
 void main() {
@@ -178,6 +179,120 @@ void main() {
     });
   });
 
+  group('ServerModelsState', () {
+    test('copyWith updates aggregate download progress', () {
+      const state = ServerModelsState();
+      final updated = state.copyWith(
+        downloadFile: 'encoder.onnx',
+        downloadPercent: 42,
+        downloadedBytes: 120,
+        totalBytes: 300,
+        downloadFraction: 0.42,
+        downloadFilesDone: 1,
+        downloadFilesTotal: 3,
+      );
+
+      expect(updated.downloadFile, 'encoder.onnx');
+      expect(updated.downloadPercent, 42);
+      expect(updated.downloadedBytes, 120);
+      expect(updated.totalBytes, 300);
+      expect(updated.downloadFraction, 0.42);
+      expect(updated.downloadFilesDone, 1);
+      expect(updated.downloadFilesTotal, 3);
+    });
+
+    test('clearDownload resets aggregate progress', () {
+      const state = ServerModelsState(
+        downloadFile: 'encoder.onnx',
+        downloadPercent: 42,
+        downloadedBytes: 120,
+        totalBytes: 300,
+        downloadFraction: 0.42,
+        downloadFilesDone: 1,
+        downloadFilesTotal: 3,
+      );
+      final cleared = state.copyWith(clearDownload: true);
+
+      expect(cleared.downloadFile, isNull);
+      expect(cleared.downloadPercent, 0);
+      expect(cleared.downloadedBytes, 0);
+      expect(cleared.totalBytes, 0);
+      expect(cleared.downloadFraction, 0);
+      expect(cleared.downloadFilesDone, 0);
+      expect(cleared.downloadFilesTotal, 0);
+    });
+  });
+
+  group('downloadFractionFromProgress', () {
+    test('weights every file equally', () {
+      expect(
+        downloadFractionFromProgress(const {
+          'files_done': 0,
+          'files_total': 2,
+          'file_downloaded': 50,
+          'file_total': 100,
+        }),
+        closeTo(0.25, 1e-9),
+      );
+      expect(
+        downloadFractionFromProgress(const {
+          'files_done': 1,
+          'files_total': 2,
+          'file_downloaded': 50,
+          'file_total': 100,
+        }),
+        closeTo(0.75, 1e-9),
+      );
+    });
+
+    test('does not drop at a file boundary', () {
+      final completed = downloadFractionFromProgress(const {
+        'files_done': 0,
+        'files_total': 2,
+        'file_downloaded': 100,
+        'file_total': 100,
+        'file_complete': true,
+      });
+      final nextFile = downloadFractionFromProgress(const {
+        'files_done': 1,
+        'files_total': 2,
+        'file_downloaded': 0,
+        'file_total': 100,
+      });
+
+      expect(completed, closeTo(0.5, 1e-9));
+      expect(nextFile, closeTo(completed, 1e-9));
+    });
+
+    test('advances unknown-size files only once they complete', () {
+      const inProgress = {
+        'files_done': 1,
+        'files_total': 4,
+        'file_downloaded': 999,
+        'file_total': 0,
+      };
+      final completed = {...inProgress, 'file_complete': true};
+
+      expect(downloadFractionFromProgress(inProgress), closeTo(0.25, 1e-9));
+      expect(downloadFractionFromProgress(completed), closeTo(0.5, 1e-9));
+    });
+
+    test('falls back to the reported percent for older servers', () {
+      expect(
+        downloadFractionFromProgress(const {
+          'downloaded': 42,
+          'total': 100,
+          'percent': 42,
+        }),
+        closeTo(0.42, 1e-9),
+      );
+      expect(
+        downloadFractionFromProgress(const {'downloaded': 1, 'total': 4}),
+        closeTo(0.25, 1e-9),
+      );
+    });
+  });
+
   group('WsMessage', () {
     test('stores type and content', () {
       final msg = WsMessage('transcription', 'Hello world');
@@ -221,12 +336,20 @@ void main() {
         data: const {
           'model': 'Canary180M',
           'file': 'model.onnx',
+          'file_downloaded': 50,
+          'file_total': 100,
+          'file_complete': false,
+          'downloaded': 42,
+          'total': 100,
           'percent': 42,
+          'files_done': 1,
+          'files_total': 3,
         },
       );
 
       expect(msg.data['file'], 'model.onnx');
       expect(msg.data['percent'], 42);
+      expect(msg.data['files_total'], 3);
     });
   });
 

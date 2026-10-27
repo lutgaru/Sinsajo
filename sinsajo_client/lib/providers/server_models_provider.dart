@@ -46,11 +46,19 @@ class ServerModelsState {
   final String? actionState;
   final String? actionMessage;
 
-  /// Download progress for the file currently being fetched.
+  /// Aggregate download progress for the whole model. The server reports
+  /// bytes across every remaining file so the UI can show one bar.
   final String? downloadFile;
   final int downloadPercent;
   final int downloadedBytes;
   final int totalBytes;
+
+  /// Exact overall completion (0..1) with every file weighted equally.
+  final double downloadFraction;
+
+  /// Files completed / total files in the current model download.
+  final int downloadFilesDone;
+  final int downloadFilesTotal;
 
   const ServerModelsState({
     this.models = const [],
@@ -65,6 +73,9 @@ class ServerModelsState {
     this.downloadPercent = 0,
     this.downloadedBytes = 0,
     this.totalBytes = 0,
+    this.downloadFraction = 0,
+    this.downloadFilesDone = 0,
+    this.downloadFilesTotal = 0,
   });
 
   bool get isBusy => actionState == 'started';
@@ -84,6 +95,9 @@ class ServerModelsState {
     int? downloadPercent,
     int? downloadedBytes,
     int? totalBytes,
+    double? downloadFraction,
+    int? downloadFilesDone,
+    int? downloadFilesTotal,
     bool clearError = false,
     bool clearAction = false,
     bool clearActionMessage = false,
@@ -112,6 +126,15 @@ class ServerModelsState {
       totalBytes: (clearAction || clearDownload)
           ? 0
           : (totalBytes ?? this.totalBytes),
+      downloadFraction: (clearAction || clearDownload)
+          ? 0
+          : (downloadFraction ?? this.downloadFraction),
+      downloadFilesDone: (clearAction || clearDownload)
+          ? 0
+          : (downloadFilesDone ?? this.downloadFilesDone),
+      downloadFilesTotal: (clearAction || clearDownload)
+          ? 0
+          : (downloadFilesTotal ?? this.downloadFilesTotal),
     );
   }
 }
@@ -284,18 +307,56 @@ class ServerModelsNotifier extends Notifier<ServerModelsState> {
       actionState: phase,
       actionMessage: message,
       clearActionMessage: message == null && phase == 'started',
+      clearDownload: phase == 'started',
       error: phase == 'failed' && message != null ? message : state.error,
     );
   }
 
   void _applyDownloadProgress(Map<String, dynamic> data) {
+    final fraction = downloadFractionFromProgress(data);
     state = state.copyWith(
       downloadFile: (data['file'] as String?) ?? state.downloadFile,
-      downloadPercent: (data['percent'] as num?)?.toInt() ?? 0,
+      downloadPercent: (fraction * 100).round(),
       downloadedBytes: (data['downloaded'] as num?)?.toInt() ?? 0,
       totalBytes: (data['total'] as num?)?.toInt() ?? 0,
+      downloadFraction: fraction,
+      downloadFilesDone: (data['files_done'] as num?)?.toInt() ?? 0,
+      downloadFilesTotal: (data['files_total'] as num?)?.toInt() ?? 0,
     );
   }
+}
+
+/// Overall completion (0..1) from a `model_download_progress` payload.
+///
+/// Every file owns an equal slice of the bar, so the value is
+/// `(files_done + current_file_fraction) / files_total`. `file_complete` marks
+/// the last snapshot of a file before the next one starts: without it the
+/// completed file would be counted twice and the bar would jump backwards.
+///
+/// Older servers only sent a per-file `percent`, which is used as a fallback.
+double downloadFractionFromProgress(Map<String, dynamic> data) {
+  final filesTotal = (data['files_total'] as num?)?.toInt() ?? 0;
+  if (filesTotal <= 0) {
+    final total = (data['total'] as num?)?.toInt() ?? 0;
+    final downloaded = (data['downloaded'] as num?)?.toInt() ?? 0;
+    final percent =
+        (data['percent'] as num?)?.toInt() ??
+        (total > 0 ? (downloaded * 100 ~/ total) : 0);
+    return (percent / 100).clamp(0.0, 1.0).toDouble();
+  }
+
+  final filesDone = (data['files_done'] as num?)?.toInt() ?? 0;
+  final fileDownloaded = (data['file_downloaded'] as num?)?.toInt() ?? 0;
+  final fileTotal = (data['file_total'] as num?)?.toInt() ?? 0;
+  final fileComplete = data['file_complete'] == true;
+  final fileFraction = fileComplete
+      ? 1.0
+      : (fileTotal > 0
+            ? (fileDownloaded / fileTotal).clamp(0.0, 1.0).toDouble()
+            : 0.0);
+  return ((filesDone + fileFraction) / filesTotal)
+      .clamp(0.0, 1.0)
+      .toDouble();
 }
 
 final serverModelsProvider =
