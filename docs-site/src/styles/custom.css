@@ -1,3 +1,47 @@
+/* Typography — self-hosted variable fonts.
+   Starlight's default stack resolves to Segoe UI on Windows but to DejaVu Sans
+   on most Linux distros (much wider and rougher), so text looked inconsistent
+   per platform. Bundling Inter makes rendering identical everywhere while
+   keeping the site fully offline/privacy-friendly (no Google Fonts requests).
+   Inter's optical-size axis (opsz) tightens large headings automatically. */
+:root {
+  --sl-font-system: 'Inter Variable', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+    'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
+    'Segoe UI Symbol', 'Noto Color Emoji';
+  --sl-font-system-mono: 'JetBrains Mono Variable', ui-monospace, SFMono-Regular, Menlo, Monaco,
+    Consolas, 'Liberation Mono', 'Courier New', monospace;
+  /* Public Starlight knobs (also read directly by some components, e.g. Badge). */
+  --sl-font: var(--sl-font-system);
+  --sl-font-mono: var(--sl-font-system-mono);
+}
+
+html {
+  /* Normalize antialiasing between ClearType on Windows and macOS/Linux. */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  font-optical-sizing: auto;
+  /* We ship real italic/bold faces — never let the browser fake them. */
+  font-synthesis: none;
+}
+
+/* Form controls don't inherit the page font by default (they fall back to
+   Arial on Linux/Windows). Keep them on Inter too. */
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+}
+
+/* Inter is designed tighter than the DejaVu fallback; large headings need
+   slightly negative tracking to avoid looking loose. */
+h1,
+h2,
+h3 {
+  letter-spacing: -0.015em;
+}
+
 /* Sinsajo brand — warm orange accent.
    Dark mode uses Starlight stock white/black (untouched).
    Light mode only gets soft warm paper + charcoal overrides below. */

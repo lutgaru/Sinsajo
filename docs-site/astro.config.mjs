@@ -15,7 +15,14 @@ export default defineConfig({
 				alt: 'Sinsajo logo',
 			},
 			favicon: '/sinsajo.svg',
-			customCss: ['./src/styles/custom.css'],
+			customCss: [
+				// Self-hosted (no Google Fonts CDN): same rendering on Linux, Windows,
+				// macOS and mobile, and no third-party requests.
+				'@fontsource-variable/inter/opsz.css',
+				'@fontsource-variable/inter/opsz-italic.css',
+				'@fontsource-variable/jetbrains-mono/wght.css',
+				'./src/styles/custom.css',
+			],
 			pagefind: false,
 			components: {
 				Header: './src/components/Header.astro',
