@@ -1,6 +1,6 @@
 ---
 title: Sinsajo — Real-Time Local Voice Transcription
-description: Self-hosted, 100% offline speech-to-text. Flutter client + Rust server with Voice Activity Detection and Canary 180M / Parakeet 0.6B models.
+description: Self-hosted, 100% offline speech-to-text. Flutter client + Rust server with Voice Activity Detection and 20+ local models (Parakeet, Canary, Cohere, SenseVoice, GigaAM, Moonshine, Whisper).
 template: splash
 hero:
   tagline: Self-hosted, Open Source, 100% offline voice transcription. Real-time, low latency, complete privacy.
@@ -44,7 +44,7 @@ import { Card, CardGrid, LinkCard, Steps, Tabs, TabItem, Badge, Aside } from '@a
     Flutter client for Android, iOS, Desktop and **Web**. Rust server runs anywhere — Docker, bare metal, VPS.
   </Card>
   <Card title="Multi language" icon="translate">
-    Multi-language target selection (en/es/fr/de/pt). English via Parakeet, translation via Canary.
+    100-language target picker gated by the active model. English via Parakeet, translation via Canary, 100 languages via Whisper.
   </Card>
 </CardGrid>
 
@@ -59,11 +59,11 @@ import { Card, CardGrid, LinkCard, Steps, Tabs, TabItem, Badge, Aside } from '@a
        │ Silero VAD v5                                   │ ONNX Model
        │ (ONNX Runtime)                                  │
        ▼                                                 ▼
- ┌─────────────────┐                             ┌──────────────────┐
- │  AudioService   │                             │  Canary 180M     │
- │  + vad package  │                             │  Flash /         │
- │  (ML-based)     │                             │  Parakeet TDT    │
- └─────────────────┘                             └──────────────────┘
+  ┌─────────────────┐                             ┌──────────────────┐
+  │  AudioService   │                             │  Parakeet /      │
+  │  + vad package  │                             │  Canary / Cohere │
+  │  (ML-based)     │                             │  Moonshine / …   │
+  └─────────────────┘                             └──────────────────┘
 ```
 
 <Steps>
@@ -71,7 +71,7 @@ import { Card, CardGrid, LinkCard, Steps, Tabs, TabItem, Badge, Aside } from '@a
 1. **Capture** — Flutter records PCM 16-bit @ 16kHz
 2. **Detect** — Silero VAD v5 detects speech (ONNX Runtime)
 3. **Transmit** — Only speech chunks sent over WebSocket
-4. **Transcribe** — Rust server runs Canary 180M Flash or Parakeet TDT 0.6B (Int8)
+4. **Transcribe** — Rust server runs the selected local model (Parakeet, Canary, Cohere, SenseVoice, GigaAM, Moonshine, Whisper*)
 5. **Display** — Real-time text + optional server-side WAV/OGG recording
 
 </Steps>
@@ -212,13 +212,16 @@ import { Card, CardGrid, LinkCard, Steps, Tabs, TabItem, Badge, Aside } from '@a
 ## Next steps
 
 <CardGrid>
+  <Card title="Choose a model" icon="puzzle">
+    Browse [Supported Models](/Sinsajo/reference/models/) for languages, download sources and feature gates. Switch at runtime from **Settings → Server → Model manager**.
+  </Card>
   <Card title="Configure target language" icon="translate">
-    Pick output language in-app. Canary translates, Parakeet is English-only. Server advertises supported languages via `model_info`.
+    Pick output language in-app. Canary translates, Parakeet is English-only, Whisper covers 100 languages. Server advertises supported languages via `model_info`.
   </Card>
   <Card title="Save recordings" icon="document">
-    Enable `save_audio` in Settings — server saves WAV/OGG per session to `records/` for export.
+    Enable `save_audio` in Settings — server saves WAV/OGG per session to `records/` for export. Desktop/mobile can also save WAV on-device; Web records a WebM download.
   </Card>
   <Card title="Tune VAD" icon="setting">
-    Adjust thresholds in `audio_service.dart` for quiet rooms or noisy environments.
+    Adjust thresholds and frame settings in **Settings → Client → Voice Activity Detection** for quiet rooms or noisy environments.
   </Card>
 </CardGrid>

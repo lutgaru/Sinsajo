@@ -4,13 +4,13 @@
 
 # Sinsajo - Real-Time Local Voice Transcription
 
-A self-hosted real-time voice transcription system that converts speech to text using local AI models. Built with **Flutter** (client) and **Rust** (server), featuring Voice Activity Detection (VAD) and support for **Canary 180M Flash** and **Parakeet TDT 0.6B** models for fast, accurate transcription.
+A self-hosted real-time voice transcription system that converts speech to text using local AI models. Built with **Flutter** (client) and **Rust** (server), featuring Voice Activity Detection (VAD) and support for all local engines from [`transcribe-rs`](https://github.com/cjpais/transcribe-rs): **Parakeet TDT 0.6B**, **Canary** (180M Flash / 1B Flash / 1B v2), **Cohere**, **SenseVoice**, **GigaAM**, **Moonshine** (+ streaming), **Whisper** and **Whisperfile** for fast, accurate transcription.
 
 ![Architecture](https://img.shields.io/badge/Architecture-Client%2FServer-blue)
 ![Language](https://img.shields.io/badge/Language-Spanish%20%2F%20English-green)
 ![Privacy](https://img.shields.io/badge/Privacy-100%25%20Local-brightgreen)
 
-> **Docs & Landing:** https://lutgaru.github.io/Sinsajo/ &nbsp;|&nbsp; **Web App:** https://lutgaru.github.io/Sinsajo/app/ &nbsp;|&nbsp; **Downloads:** [Releases](https://github.com/lutgaru/Sinsajo/releases)
+> **Docs & Landing:** https://lutgaru.com/Sinsajo/ &nbsp;|&nbsp; **Web App:** https://lutgaru.com/Sinsajo/app/ &nbsp;|&nbsp; **Downloads:** [Releases](https://github.com/lutgaru/Sinsajo/releases)
 
 ## 🎯 Features
 
@@ -20,9 +20,11 @@ A self-hosted real-time voice transcription system that converts speech to text 
 - ✅ **Low latency** - ~150-300ms end-to-end
 - ✅ **Multi-platform** - Android, iOS, Desktop (Flutter)
 - ✅ **Spanish support** - Native Spanish transcription with punctuation
-- ✅ **Target language selection** - Choose the output language (English, Spanish, French, German, Portuguese) from the client settings; translation is applied by models that support it, and the client only enables the languages the active server model advertises
+- ✅ **Target language selection** - Choose the output language from the client settings; translation is applied by models that support it, and the client only enables the languages the active server model advertises (up to 100 languages on Whisper/Whisperfile, 25 on Canary 1B v2)
 - ✅ **Self-hosted** - Run on your own hardware
+- ✅ **Runtime model manager** - List, download, load and delete models from the client without restarting the server
 - ✅ **Audio recording** - Saves session audio (WAV/OGG) to the server, configurable from the client settings; optionally also saves VAD speech as a WAV file on the client device for listen-back, or records the session in the browser (WebM download) on Web
+- ✅ **Persistent settings** - Client and server settings survive restarts
 
 ## 🏗️ Architecture
 
@@ -36,10 +38,13 @@ A self-hosted real-time voice transcription system that converts speech to text 
        │ (ONNX Runtime)                                  │
        ▼                                                 ▼
 ┌─────────────────┐                             ┌──────────────────┐
-│  AudioService   │                             │  Canary 180M     │
-│  + vad package  │                             │  Flash /         │
-│  (ML-based)     │                             │  Parakeet TDT    │
-└─────────────────┘                             └──────────────────┘
+│  AudioService   │                             │  Parakeet /      │
+│  + vad package  │                             │  Canary / Cohere │
+│  (ML-based)     │                             │  SenseVoice /    │
+└─────────────────┘                             │  GigaAM /        │
+                                                │  Moonshine /     │
+                                                │  Whisper*        │
+                                                └──────────────────┘
 ```
 
 ### Data Flow
@@ -47,14 +52,14 @@ A self-hosted real-time voice transcription system that converts speech to text 
 1. **Audio Capture** - Flutter records PCM 16-bit @ 16kHz
 2. **Voice Activity Detection** - Silero VAD v5 (ML-based) detects speech via ONNX Runtime
 3. **WebSocket Transmission** - Sends only speech chunks (not silence)
-4. **Transcription** - Rust server processes with Canary or Parakeet model
+4. **Transcription** - Rust server processes with the selected local model (Parakeet, Canary, Cohere, SenseVoice, GigaAM, Moonshine, Whisper/Whisperfile*)
 5. **Audio Recording** - Rust server saves session as WAV to configurable `records/` directory on clean
 6. **Display** - Client shows transcribed text in real-time
 
 ### Protocol
 
 **Client → Server:**
-- `{"type": "start", "sample_rate": 16000, "save_audio": true, "format": "wav", "target_language": "es"}` - Start session with session-scoped audio save settings (`save_audio`: enable/disable, `format`: `wav` or `ogg`) and output `target_language` (`en`, `es`, `fr`, `de`, `pt`; applied by models that support translation, ignored otherwise)
+- `{"type": "start", "sample_rate": 16000, "save_audio": true, "format": "wav", "target_language": "es"}` - Start session with session-scoped audio save settings (`save_audio`: enable/disable, `format`: `wav` or `ogg`) and output `target_language` (BCP-47 code; the server validates it against the loaded model's supported languages, translation is applied by models that support it, otherwise used as a hint or ignored)
 - Binary PCM chunks - Audio data
 - `{"type": "stop"}` - End session
 - `{"type": "clean"}` - End session and save recorded audio as `wav`/`ogg` file
@@ -63,7 +68,7 @@ A self-hosted real-time voice transcription system that converts speech to text 
 - `{"type": "transcription", "text": "..."}` - Transcribed text
 - `{"type": "status", "message": "ready"}` - Status updates
 - `{"type": "error", "message": "..."}` - Error messages
-- `{"type": "model_info", "model": "Canary180M", "languages": ["en", "es", "fr", "de", "pt"]}` - Sent on connect; the loaded model and the target languages it supports (the client shows the model in Settings and enables only the supported language options)
+- `{"type": "model_info", "model": "Canary1BV2", "languages": ["bg", "hr", "cs", ...]}` - Sent on connect; the loaded model and the target languages it supports (the client shows the model in Settings and enables only the supported language options)
 
 ## 📦 Tech Stack
 
@@ -77,9 +82,11 @@ A self-hosted real-time voice transcription system that converts speech to text 
 ### Server (Rust)
 - **Runtime**: Tokio (async)
 - **WebSocket**: `tokio-tungstenite`
-- **ML**: `transcribe-rs` (ONNX Runtime)
-- **Models**: Canary 180M Flash / Parakeet TDT 0.6B (Int8 quantized)
-- **Auto-download**: Models downloaded automatically from HuggingFace on startup
+- **ML**: `transcribe-rs` (ONNX Runtime; optional `whisper-cpp` / `whisperfile` features)
+- **Models**: Parakeet TDT 0.6B, Canary 180M Flash / 1B Flash / 1B v2, Cohere (int4/int8), SenseVoice, GigaAM v3, Moonshine (tiny/base/base-es + tiny lang variants + streaming), Whisper (tiny-en/small)*, Whisperfile (small)*
+- **Auto-download**: Models downloaded automatically from HuggingFace (or mirror tarballs for Moonshine/SenseVoice/Whisperfile) on startup
+
+\* Whisper/Whisperfile backends require building with cargo features: `cargo run --release --features whisper-cpp -- --model WhisperSmall ...` or `--features whisperfile`. The default build is ONNX-only and stays lightweight.
 
 ## 🚀 Quick Start
 
@@ -155,7 +162,7 @@ docker compose up -d
 
 | Arg | Default | Description |
 |-----|---------|-------------|
-| `--model` | *(prompt)* | Model name: `ParakeetTDT` or `Canary180M` |
+| `--model` | *(prompt)* | Model name (see Supported models below; e.g. `ParakeetTDT`, `Canary180M`, `Canary1BV2`, `CohereInt4`, `SenseVoice`, `GigaAM`, `MoonshineBase`, `WhisperSmall`, `WhisperfileSmall`) |
 | `--autodownload-model` | `false` | Auto-download model if not found locally |
 | `--port` | `8765` | WebSocket server port |
 | `--model-dir` | `./models` | Directory to store model files |
@@ -202,23 +209,26 @@ Edit `sinsajo_client/lib/providers/transcription_provider.dart`:
 const String kWsUrl = 'ws://192.168.1.100:8765';  // ← Your server IP
 ```
 
-Other client options (microphone gain, audio source, server-side audio saving, client-side audio saving, VAD tuning, target language, server IP) are configured from the in-app Settings screen and persist across restarts (localStorage on Web).
+Other client options (microphone gain, audio source, server-side audio saving, client-side audio saving, VAD tuning, target language, server IP and the runtime model manager) are configured from the in-app Settings screen and persist across restarts (localStorage on Web).
 
 ### VAD Configuration
 
-VAD is handled by the [`vad`](https://pub.dev/packages/vad) package (Silero VAD v5 via ONNX Runtime). Parameters are passed to `VadHandler.startListening()` in `sinsajo_client/lib/services/audio_service.dart`:
+VAD is handled by the [`vad`](https://pub.dev/packages/vad) package (Silero VAD v5 via ONNX Runtime). Defaults live in `sinsajo_client/lib/providers/settings_provider.dart` and are passed to `VadHandler.startListening()` in `sinsajo_client/lib/services/audio_service.dart`:
 
 ```dart
 await _vadHandler.startListening(
   model: 'v5',                          // Silero VAD v5
   frameSamples: 512,                     // 32ms frames
-  positiveSpeechThreshold: 0.5,          // Probability threshold to start speech
+  positiveSpeechThreshold: 0.45,         // Probability threshold to start speech
   negativeSpeechThreshold: 0.35,         // Probability threshold to end speech
-  redemptionFrames: 8,                   // Silence frames needed to end utterance
-  preSpeechPadFrames: 1,                 // Frames of pre-roll before speech
-  minSpeechFrames: 3,                    // Minimum speech frames to emit
+  redemptionFrames: 7,                   // Silence frames needed to end utterance
+  preSpeechPadFrames: 8,                 // Frames of pre-roll before speech
+  minSpeechFrames: 8,                    // Minimum speech frames to emit
+  endSpeechPadFrames: 3,                 // Trailing frames kept after speech
 );
 ```
+
+All of these can also be changed in **Settings → Client → Voice Activity Detection**; no rebuild is needed.
 
 **Tuning tips:**
 - Lower `positiveSpeechThreshold` (0.3) for quieter voices
@@ -366,17 +376,44 @@ Deploy: push to `master` triggers `.github/workflows/docs.yml` — builds Astro 
 
 ### Adding New Models
 
-Switch between supported models via `--model`:
+Switch between supported models via `--model` (an unknown name prints the full list):
 
 ```bash
-# Parakeet TDT 0.6B (larger, more accurate, default)
+# Parakeet TDT 0.6B (larger, more accurate, English-only, default)
 cargo run --release -- --model ParakeetTDT --autodownload-model
 
-# Canary 180M (smaller, faster)
+# Canary 180M Flash (smaller, faster, en/de/es/fr)
 cargo run --release -- --model Canary180M --autodownload-model
+
+# Canary 1B v2 (25 languages, incl. Portuguese)
+cargo run --release -- --model Canary1BV2 --autodownload-model
+
+# Whisper Small (multilingual, needs whisper-cpp feature)
+cargo run --release --features whisper-cpp -- --model WhisperSmall --autodownload-model
 ```
 
-To add a new model, edit `server/src/config.rs` and add an entry to the `MODELS` array with the HuggingFace repository and folder name.
+#### Supported models
+
+The default binary only includes the ONNX models. An unknown `--model` name prints the flags compiled into your binary, plus rebuild hints for feature-gated ones (`Whisper*` needs `--features whisper-cpp`, `Whisperfile*` needs `--features whisperfile`).
+
+| Model flag | Engine | Languages | Notes |
+|------------|--------|-----------|-------|
+| `ParakeetTDT` | Parakeet TDT 0.6B v3 (int8) | en | English-only, most accurate |
+| `Canary180M` | Canary 180M Flash (int8) | en, de, es, fr | Fast multilingual + translation |
+| `Canary1BFlash` | Canary 1B Flash (int8) | en, de, es, fr | Larger Flash variant |
+| `Canary1BV2` | Canary 1B v2 (int8) | 25 langs (incl. pt) | Widest Canary coverage |
+| `CohereInt4` / `CohereInt8` | Cohere Transcribe | 14 langs | int4 default, smaller download |
+| `SenseVoice` | SenseVoice Small (int8) | zh, en, ja, ko, yue | Tarball mirror auto-download |
+| `GigaAM` | GigaAM v3 (int8) | ru | Russian-only |
+| `MoonshineTiny` / `MoonshineBase` / `MoonshineBaseEs` | Moonshine | en / en / es | Base auto-downloads; others: place `encoder_model.onnx`, `decoder_model_merged.onnx`, `tokenizer.json` in `models/<dir>` |
+| `MoonshineTinyAr/Zh/Ja/Ko/Uk/Vi` | Moonshine Tiny | ar/zh/ja/ko/uk/vi | Manual weight placement (same 3 files) |
+| `MoonshineStreamingTinyEn` | Moonshine Streaming | en | Tarball mirror auto-download |
+| `WhisperTinyEn` / `WhisperSmall` | Whisper (whisper.cpp) | en / 100 langs | Needs `--features whisper-cpp` |
+| `WhisperfileSmall` | Whisperfile server | 100 langs | Needs `--features whisperfile`; spawns local server on port 8080 (`WHISPERFILE_PORT` overrides) |
+
+The OpenAI remote engine from `transcribe-rs` is intentionally not wired in: Sinsajo is 100% offline by design and the remote API needs an API key plus async file uploads, which doesn't fit the real-time WebSocket path.
+
+To add a new model, add a module under `server/src/model/` implementing the `Model` trait plus a `ModelDefinition` entry (HuggingFace repo + folder, direct URL, or tarball mirror).
 
 ### Enabling GPU Acceleration
 
@@ -405,7 +442,7 @@ let result = model.transcribe_with(
 )?;
 ```
 
-When a target language is set, both `language` and `target_language` are pinned to it, so same-language speech is transcribed natively and foreign speech is translated into the selected language. Parakeet is English-only and ignores the target language.
+When a target language is set, Canary pins both `language` and `target_language` to it, so same-language speech is transcribed natively and foreign speech is translated into the selected language. Canary Flash covers en/de/es/fr; Canary 1B v2 covers 25 languages (adds Portuguese among others). Parakeet is English-only and ignores the target language; Whisper/Whisperfile use it as the language hint.
 
 ## 📋 Roadmap
 
@@ -414,12 +451,18 @@ When a target language is set, both `language` and `target_language` are pinned 
 - [x] Voice Activity Detection
 - [x] Multi-platform support
 - [x] Spanish language support
+- [x] Full `transcribe-rs` local model registry
+- [x] 100-language target picker gated by the active model
+- [x] Runtime model manager (list/download/load/delete)
+- [x] Configurable VAD settings in the UI
+- [x] Persistent client settings
+- [x] Audio recording (WAV/OGG server-side, WAV on-device, WebM on Web)
 - [x] Session restart without crashes
+- [x] CI model download link check
 
 ### In Progress 🔄
-- [ ] Model switching UI (client)
-- [x] Audio recording (WAV export)
 - [ ] Export transcriptions (TXT, SRT)
+- [ ] Model manager polish (size estimates and richer metadata)
 
 ## 🐛 Known Limitations
 
@@ -427,7 +470,7 @@ When a target language is set, both `language` and `target_language` are pinned 
 - Int8 model has ~2% lower accuracy than Float32
 - Single language per session (no mixed languages)
 - No authentication (local network only)
-- First run downloads the model (~2-3 GB) from HuggingFace
+- First run downloads the selected model (from ~75 MB to ~2-3 GB depending on the model)
 - Model and ONNX Runtime loading takes ~2-3 seconds on startup
 
 ## 📄 License

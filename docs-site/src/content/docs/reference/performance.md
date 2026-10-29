@@ -15,7 +15,7 @@ description: Benchmarks and tuning tips.
 
 - **Quantization** — Int8 is ~2% less accurate than Float32 but ~2× faster
 - **VAD** — Saves bandwidth and server CPU by skipping silence
-- **Model choice** — `Canary180M` (180M params) faster; `ParakeetTDT` (0.6B) more accurate
+- **Model choice** — `MoonshineTiny` / `Canary180M` (tiny, fastest); `ParakeetTDT` / `Canary1BV2` (larger, more accurate); `WhisperSmall` (multilingual, heavier). See [Supported Models](/Sinsajo/reference/models/).
 - **GPU** — `transcribe-rs` with `OrtAccelerator::Auto` / `Cuda`
 - **Chunk size** — Smaller `frameSamples` (256) = lower latency but more overhead
 

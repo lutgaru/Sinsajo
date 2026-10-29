@@ -49,11 +49,18 @@ Lower thresholds for quiet speakers.
 - Use Int8 model (default is Int8)
 - Enable CUDA/DirectML via `transcribe-rs`
 - Reduce chunk size in VAD config
-- Try `--model Canary180M` (180M vs 600M)
+- Try a smaller model: `--model Canary180M` or `--model MoonshineTiny` (tiny vs 0.6B)
 
 ## Models not downloading
 
-Check `models/` permissions and HuggingFace connectivity. Run with `--model-dir` to an empty writable dir and `--autodownload-model`.
+Check `models/` permissions and connectivity (HuggingFace + mirror tarballs for Moonshine/SenseVoice/Whisperfile). Run with `--model-dir` to an empty writable dir and `--autodownload-model`. An unknown `--model` name prints all valid flags. See [Supported Models](/Sinsajo/reference/models/).
+
+## Model manager errors
+
+- **"Model is not installed. Download it first."** — the `load_model` command was sent for a model whose files are missing. Download it from the model manager or run the server with `--autodownload-model`.
+- **"Cannot delete the active model."** — load another model first, then delete the old one.
+- **"The server did not answer the model list request."** — the WebSocket disconnected. Check the server IP and that port `8765` is reachable.
+- **A feature-gated model is missing** — `WhisperTinyEn` / `WhisperSmall` require a build with `--features whisper-cpp`; `WhisperfileSmall` requires `--features whisperfile`. The published Docker image and binaries are ONNX-only.
 
 ## APK not installing
 

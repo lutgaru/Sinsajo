@@ -62,8 +62,10 @@ class InMemorySettingsStore implements SettingsStore {
 
 void main() {
   group('TargetLanguage', () {
-    test('has the five supported languages with codes', () {
-      expect(TargetLanguage.values, hasLength(5));
+    test('covers the full transcribe-rs language union with codes', () {
+      // Whisper/Whisperfile 100 ⊇ Canary V2 25, Cohere 14, SenseVoice 5,
+      // GigaAM, Moonshine family.
+      expect(TargetLanguage.values, hasLength(100));
 
       expect(TargetLanguage.english.label, 'English');
       expect(TargetLanguage.english.code, 'en');
@@ -75,6 +77,16 @@ void main() {
       expect(TargetLanguage.german.code, 'de');
       expect(TargetLanguage.portuguese.label, 'Portuguese');
       expect(TargetLanguage.portuguese.code, 'pt');
+
+      // Spot-check languages from other engines.
+      expect(TargetLanguage.russian.code, 'ru'); // GigaAM
+      expect(TargetLanguage.cantonese.code, 'yue'); // SenseVoice
+      expect(TargetLanguage.italian.code, 'it'); // Cohere
+      expect(TargetLanguage.ukrainian.code, 'uk'); // Canary V2
+
+      // Codes are unique.
+      final codes = TargetLanguage.values.map((l) => l.code).toList();
+      expect(codes.toSet(), hasLength(codes.length));
     });
   });
 

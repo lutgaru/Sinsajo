@@ -13,11 +13,22 @@ class WsMessage {
   final String content;
   final String? model;
   final List<String>? languages;
-  WsMessage(this.type, this.content, {this.model, this.languages});
+
+  /// Full decoded payload, used by multi-field messages such as the model
+  /// manager (`model_list`, `model_action`, `model_download_progress`).
+  final Map<String, dynamic> data;
+
+  WsMessage(
+    this.type,
+    this.content, {
+    this.model,
+    this.languages,
+    this.data = const {},
+  });
 }
 
 class WsService {
-  final String url;
+  String url;
 
   WebSocketChannel? _channel;
   StreamSubscription? _sub;
@@ -53,6 +64,17 @@ class WsService {
   WsService({required this.url});
 
   int _connectSeq = 0;
+
+  /// Changes the target address. Call [reconnect] (or [connect] after
+  /// [disconnect]) for the new URL to take effect.
+  void updateUrl(String newUrl) {
+    url = newUrl;
+  }
+
+  Future<void> reconnect() async {
+    await disconnect();
+    await connect();
+  }
 
   Future<void> connect() async {
     if (_status == WsStatus.connected || _isDisposed) return;
@@ -228,6 +250,22 @@ class WsService {
     _sendJson({'type': 'discard'});
   }
 
+  void requestModelList() {
+    _sendJson({'type': 'list_models'});
+  }
+
+  void downloadModel(String model) {
+    _sendJson({'type': 'download_model', 'model': model});
+  }
+
+  void loadModel(String model) {
+    _sendJson({'type': 'load_model', 'model': model});
+  }
+
+  void deleteModel(String model) {
+    _sendJson({'type': 'delete_model', 'model': model});
+  }
+
   void sendAudioChunk(Uint8List pcmBytes) {
     if (_status != WsStatus.connected) {
       debugPrint('[WS] ⚠ Audio not sent: not connected');
@@ -257,7 +295,13 @@ class WsService {
       final text = (map['text'] ?? map['message'] ?? '') as String;
       final model = map['model'] as String?;
       final languages = (map['languages'] as List?)?.map((e) => e.toString()).toList();
-      _messageController.add(WsMessage(type, text, model: model, languages: languages));
+      _messageController.add(WsMessage(
+        type,
+        text,
+        model: model,
+        languages: languages,
+        data: map,
+      ));
     } catch (e) {
       debugPrint('[WS] ⚠ Error parsing message: $e');
     }

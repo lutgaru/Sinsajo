@@ -15,3 +15,10 @@ vorbis_rs = "0.5"
 clap = { version = "4", features = ["derive"] }
 reqwest = { version = "0.12", features = ["json", "stream"] }
 indicatif = "0.17"
+tar = "0.4"
+flate2 = "1.0"
+
+[features]
+default = []
+whisper-cpp = ["transcribe-rs/whisper-cpp"]
+whisperfile = ["transcribe-rs/whisperfile"]
