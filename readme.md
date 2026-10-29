@@ -10,7 +10,7 @@ A self-hosted real-time voice transcription system that converts speech to text 
 ![Language](https://img.shields.io/badge/Language-Spanish%20%2F%20English-green)
 ![Privacy](https://img.shields.io/badge/Privacy-100%25%20Local-brightgreen)
 
-> **Docs & Landing:** https://lutgaru.github.io/Sinsajo/ &nbsp;|&nbsp; **Web App:** https://lutgaru.github.io/Sinsajo/app/ &nbsp;|&nbsp; **Downloads:** [Releases](https://github.com/lutgaru/Sinsajo/releases)
+> **Docs & Landing:** https://lutgaru.com/Sinsajo/ &nbsp;|&nbsp; **Web App:** https://lutgaru.com/Sinsajo/app/ &nbsp;|&nbsp; **Downloads:** [Releases](https://github.com/lutgaru/Sinsajo/releases)
 
 ## 🎯 Features
 
@@ -22,7 +22,9 @@ A self-hosted real-time voice transcription system that converts speech to text 
 - ✅ **Spanish support** - Native Spanish transcription with punctuation
 - ✅ **Target language selection** - Choose the output language from the client settings; translation is applied by models that support it, and the client only enables the languages the active server model advertises (up to 100 languages on Whisper/Whisperfile, 25 on Canary 1B v2)
 - ✅ **Self-hosted** - Run on your own hardware
+- ✅ **Runtime model manager** - List, download, load and delete models from the client without restarting the server
 - ✅ **Audio recording** - Saves session audio (WAV/OGG) to the server, configurable from the client settings; optionally also saves VAD speech as a WAV file on the client device for listen-back, or records the session in the browser (WebM download) on Web
+- ✅ **Persistent settings** - Client and server settings survive restarts
 
 ## 🏗️ Architecture
 
@@ -207,23 +209,26 @@ Edit `sinsajo_client/lib/providers/transcription_provider.dart`:
 const String kWsUrl = 'ws://192.168.1.100:8765';  // ← Your server IP
 ```
 
-Other client options (microphone gain, audio source, server-side audio saving, client-side audio saving, VAD tuning, target language, server IP) are configured from the in-app Settings screen and persist across restarts (localStorage on Web).
+Other client options (microphone gain, audio source, server-side audio saving, client-side audio saving, VAD tuning, target language, server IP and the runtime model manager) are configured from the in-app Settings screen and persist across restarts (localStorage on Web).
 
 ### VAD Configuration
 
-VAD is handled by the [`vad`](https://pub.dev/packages/vad) package (Silero VAD v5 via ONNX Runtime). Parameters are passed to `VadHandler.startListening()` in `sinsajo_client/lib/services/audio_service.dart`:
+VAD is handled by the [`vad`](https://pub.dev/packages/vad) package (Silero VAD v5 via ONNX Runtime). Defaults live in `sinsajo_client/lib/providers/settings_provider.dart` and are passed to `VadHandler.startListening()` in `sinsajo_client/lib/services/audio_service.dart`:
 
 ```dart
 await _vadHandler.startListening(
   model: 'v5',                          // Silero VAD v5
   frameSamples: 512,                     // 32ms frames
-  positiveSpeechThreshold: 0.5,          // Probability threshold to start speech
+  positiveSpeechThreshold: 0.45,         // Probability threshold to start speech
   negativeSpeechThreshold: 0.35,         // Probability threshold to end speech
-  redemptionFrames: 8,                   // Silence frames needed to end utterance
-  preSpeechPadFrames: 1,                 // Frames of pre-roll before speech
-  minSpeechFrames: 3,                    // Minimum speech frames to emit
+  redemptionFrames: 7,                   // Silence frames needed to end utterance
+  preSpeechPadFrames: 8,                 // Frames of pre-roll before speech
+  minSpeechFrames: 8,                    // Minimum speech frames to emit
+  endSpeechPadFrames: 3,                 // Trailing frames kept after speech
 );
 ```
+
+All of these can also be changed in **Settings → Client → Voice Activity Detection**; no rebuild is needed.
 
 **Tuning tips:**
 - Lower `positiveSpeechThreshold` (0.3) for quieter voices
@@ -446,12 +451,18 @@ When a target language is set, Canary pins both `language` and `target_language`
 - [x] Voice Activity Detection
 - [x] Multi-platform support
 - [x] Spanish language support
+- [x] Full `transcribe-rs` local model registry
+- [x] 100-language target picker gated by the active model
+- [x] Runtime model manager (list/download/load/delete)
+- [x] Configurable VAD settings in the UI
+- [x] Persistent client settings
+- [x] Audio recording (WAV/OGG server-side, WAV on-device, WebM on Web)
 - [x] Session restart without crashes
+- [x] CI model download link check
 
 ### In Progress 🔄
-- [ ] Model switching UI (client)
-- [x] Audio recording (WAV export)
 - [ ] Export transcriptions (TXT, SRT)
+- [ ] Model manager polish (size estimates and richer metadata)
 
 ## 🐛 Known Limitations
 
@@ -459,7 +470,7 @@ When a target language is set, Canary pins both `language` and `target_language`
 - Int8 model has ~2% lower accuracy than Float32
 - Single language per session (no mixed languages)
 - No authentication (local network only)
-- First run downloads the model (~2-3 GB) from HuggingFace
+- First run downloads the selected model (from ~75 MB to ~2-3 GB depending on the model)
 - Model and ONNX Runtime loading takes ~2-3 seconds on startup
 
 ## 📄 License

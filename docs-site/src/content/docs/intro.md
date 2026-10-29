@@ -18,13 +18,16 @@ description: What Sinsajo is, features and when to use it.
 - ✅ Multi-platform — Android, iOS, Desktop, **Web** (Flutter)
 - ✅ Spanish native + target language selection (100-language picker, enabled per model's advertised support)
 - ✅ Self-hosted — Docker or Cargo
-- ✅ Audio recording — WAV/OGG saved server-side, configurable from client
+- ✅ Runtime model manager — download, switch and delete models from the client
+- ✅ Audio recording — WAV/OGG saved server-side, optional on-device WAV, or WebM download on Web
+- ✅ Persistent settings — client and server settings survive restarts
+- ✅ 20+ local models — see [Supported Models](/Sinsajo/reference/models/)
 
 ## Tech Stack
 
 | Layer | Stack |
 |-------|-------|
-| Client | Flutter 3.x, Material 3, Riverpod 2.x, `record`, `web_socket_channel`, `vad` (Silero VAD v5) |
+| Client | Flutter 3.x, Material 3, Riverpod 2.x, `record`, `web_socket_channel`, `vad` (Silero VAD v5), `shared_preferences` |
 | Server | Rust + Tokio, `tokio-tungstenite`, `transcribe-rs` (ONNX Runtime; optional whisper-cpp/whisperfile), 20+ local model flags |
 | Hosting | GitHub Pages (static) for landing + docs + Flutter Web; Rust server on your infra |
 | Distribution | APK via GitHub Releases, Docker Hub `lutgaru/sinsajo-server` |
@@ -42,6 +45,6 @@ description: What Sinsajo is, features and when to use it.
 - Int8 model ~2% less accurate than Float32
 - Single language per session
 - No auth (local network only)
-- First run downloads ~2–3GB model from HuggingFace, cold start ~2–3s
+- First run downloads the selected model (from ~75 MB for Whisper Tiny to ~2–3 GB for larger models); cold start ~2–3s afterwards
 
-Next: [Quick Start](/Sinsajo/guides/quickstart/).
+Next: [Quick Start](/Sinsajo/guides/quickstart/) · [Supported Models](/Sinsajo/reference/models/)

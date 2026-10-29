@@ -212,13 +212,16 @@ import { Card, CardGrid, LinkCard, Steps, Tabs, TabItem, Badge, Aside } from '@a
 ## Next steps
 
 <CardGrid>
+  <Card title="Choose a model" icon="puzzle">
+    Browse [Supported Models](/Sinsajo/reference/models/) for languages, download sources and feature gates. Switch at runtime from **Settings → Server → Model manager**.
+  </Card>
   <Card title="Configure target language" icon="translate">
     Pick output language in-app. Canary translates, Parakeet is English-only, Whisper covers 100 languages. Server advertises supported languages via `model_info`.
   </Card>
   <Card title="Save recordings" icon="document">
-    Enable `save_audio` in Settings — server saves WAV/OGG per session to `records/` for export.
+    Enable `save_audio` in Settings — server saves WAV/OGG per session to `records/` for export. Desktop/mobile can also save WAV on-device; Web records a WebM download.
   </Card>
   <Card title="Tune VAD" icon="setting">
-    Adjust thresholds in `audio_service.dart` for quiet rooms or noisy environments.
+    Adjust thresholds and frame settings in **Settings → Client → Voice Activity Detection** for quiet rooms or noisy environments.
   </Card>
 </CardGrid>

@@ -104,7 +104,7 @@ Skip this if you only use Docker or precompiled binaries / Web App / APK.
 </Tabs>
 
 <Aside type="tip" title="Model download">
-  Server auto-downloads on first run (HuggingFace, or mirror tarballs for Moonshine/SenseVoice/Whisperfile). Override dirs with `--model-dir` / `--records-dir`. Use `Canary180M` for smaller/faster multilingual, `ParakeetTDT` for English accuracy, `Canary1BV2` for 25 languages.
+  Server auto-downloads on first run (HuggingFace, or mirror tarballs for Moonshine/SenseVoice/Whisperfile). Override dirs with `--model-dir` / `--records-dir`. Use `Canary180M` for smaller/faster multilingual, `ParakeetTDT` for English accuracy, `Canary1BV2` for 25 languages. See [Supported Models](/Sinsajo/reference/models/).
 </Aside>
 
 ## 2. Connect a Client — pick one
@@ -138,7 +138,7 @@ Skip this if you only use Docker or precompiled binaries / Web App / APK.
     flutter build web --release --base-href /Sinsajo/app/  # Web (merged into docs-site/dist/app/)
     ```
 
-    Default URL is `lib/providers/transcription_provider.dart` → `kWsUrl`, overridden in Settings UI (gain, source, `save_audio`, `target_language`).
+    Default URL is `lib/providers/transcription_provider.dart` → `kWsUrl`, overridden in Settings UI. Settings are split into **Client** (gain, source, audio saving, VAD) and **Server** (IP, model manager, audio saving, language) tabs and persist across restarts.
   </TabItem>
 </Tabs>
 
@@ -149,8 +149,9 @@ Skip this if you only use Docker or precompiled binaries / Web App / APK.
 1. Tap the microphone button in the client
 2. Speak — VAD highlights when speech is detected (only speech is sent)
 3. See real-time text; `model_info` tells you which languages are supported
-4. Tap **Stop** or **Clean** to end — `clean` also saves WAV/OGG on the server `records/`
+4. Tap **Stop** or **Clean** to end — `clean` also saves WAV/OGG on the server `records/`; **Discard** drops the session without saving
 5. **Copy** or **clear** the transcription
+6. Open **Settings → Server → Model manager** to download or switch models without restarting the server
 
 </Steps>
 

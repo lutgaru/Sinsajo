@@ -84,15 +84,51 @@ import { Tabs, TabItem, Aside, Card, CardGrid } from '@astrojs/starlight/compone
 
     Add new models as a module under `server/src/model/` implementing the `Model` trait plus a `ModelDefinition` entry. If `--model` is omitted it reads `sinsajo-config.json`, then prompts.
 
-    Available: `ParakeetTDT` (0.6B, more accurate, English), `Canary180M` / `Canary1BFlash` (Flash, faster, en/de/es/fr), `Canary1BV2` (25 languages), `CohereInt4` / `CohereInt8` (14 languages), `SenseVoice` (zh/en/ja/ko/yue), `GigaAM` (Russian), `MoonshineTiny` / `MoonshineBase` / `MoonshineBaseEs` + tiny lang variants + `MoonshineStreamingTinyEn`, and — with cargo features — `WhisperTinyEn` / `WhisperSmall` (`--features whisper-cpp`) and `WhisperfileSmall` (`--features whisperfile`).
+    Available: see [Supported Models](/Sinsajo/reference/models/) for the full list. The default build is ONNX-only; Whisper needs `--features whisper-cpp` and Whisperfile needs `--features whisperfile`:
+
+    ```bash
+    cargo run --release --features whisper-cpp -- --model WhisperSmall --autodownload-model
+    cargo run --release --features whisperfile -- --model WhisperfileSmall --autodownload-model
+    ```
+
+    An unknown `--model` name prints the flags compiled into your binary plus rebuild hints for feature-gated models.
   </TabItem>
 </Tabs>
 
 ## Models
 
-Auto-download handles first-run downloads (HuggingFace single files, or mirror tarballs for Moonshine/SenseVoice/Whisperfile). Subsequent starts ~2–3s. Override dirs with `--model-dir` / `--records-dir`.
+The server ships the full local `transcribe-rs` registry — Parakeet, Canary (180M/1B Flash/1B v2), Cohere (int4/int8), SenseVoice, GigaAM, Moonshine (+ streaming), Whisper and Whisperfile. The OpenAI remote engine is intentionally excluded: Sinsajo is 100% offline.
 
-Full list: `ParakeetTDT`, `Canary180M`, `Canary1BFlash`, `Canary1BV2`, `CohereInt4`, `CohereInt8`, `SenseVoice`, `GigaAM`, `MoonshineTiny`, `MoonshineBase`, `MoonshineBaseEs`, `MoonshineTinyAr/Zh/Ja/Ko/Uk/Vi` (manual weights), `MoonshineStreamingTinyEn`, `WhisperTinyEn`, `WhisperSmall`, `WhisperfileSmall`. An unknown `--model` name prints all valid flags. The OpenAI remote engine is intentionally excluded (Sinsajo is 100% offline).
+See **[Supported Models](/Sinsajo/reference/models/)** for flags, languages, download sources, manual-install models and feature gates.
+
+Auto-download handles first-run downloads (HuggingFace single files, or mirror tarballs for Moonshine/SenseVoice/Whisperfile). Subsequent starts ~2–3s. Override dirs with `--model-dir` / `--records-dir`. A `.sinsajo_manifest.json` per model tracks installed files so partial downloads are detected.
+
+### Feature-gated builds
+
+Whisper and Whisperfile are compiled out of the default binary to keep it lightweight:
+
+```bash
+# Build with one backend
+cargo build --release --features whisper-cpp
+
+# Both backends
+cargo build --release --features "whisper-cpp whisperfile"
+
+# Docker
+docker build --build-arg FEATURES=whisper-cpp -t sinsajo-server:whisper .
+```
+
+The published Docker image and precompiled binaries are ONNX-only. `WhisperfileSmall` also starts a local HTTP server on port `8080` (`WHISPERFILE_PORT` overrides it).
+
+## Runtime model manager
+
+Clients can switch models without restarting the server. The **Settings → Server → Model manager** section lists every compiled model, marks installed/active entries, and supports:
+
+- **Download** — fetch a missing model with per-file and aggregate progress
+- **Load / Reload** — swap the active model in memory
+- **Delete** — remove an installed model (the active model cannot be deleted)
+
+Only one model operation runs at a time. Loading a model broadcasts the new `model_info` and saves the choice to `sinsajo-config.json`. The raw messages are documented in [Protocol → Model manager](/Sinsajo/guides/protocol/#model-manager).
 
 ## GPU acceleration
 
@@ -117,9 +153,9 @@ Parakeet is English-only and ignores the target language; Whisper/Whisperfile us
 
 ## Persistence
 
-- Models: `models/` (or `--model-dir`)
+- Models: `models/` (or `--model-dir`), one subdirectory per model
 - Recordings: `records/` (WAV/OGG, triggered by client `clean`)
-- Config: `sinsajo-config.json` (persists last chosen model)
+- Config: `sinsajo-config.json` (last chosen or loaded model)
 
 ## Deployment
 

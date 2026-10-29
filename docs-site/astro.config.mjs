@@ -49,6 +49,7 @@ export default defineConfig({
 				{
 					label: 'Reference',
 					items: [
+						{ label: 'Models', slug: 'reference/models' },
 						{ label: 'Troubleshooting', slug: 'reference/troubleshooting' },
 						{ label: 'Performance', slug: 'reference/performance' },
 						{ label: 'Roadmap', slug: 'reference/roadmap' },

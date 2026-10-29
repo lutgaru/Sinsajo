@@ -78,23 +78,46 @@ import { Tabs, TabItem, Aside, Card, CardGrid } from '@astrojs/starlight/compone
     const String kWsUrl = 'ws://192.168.1.100:8765';
     ```
 
-    Other in-app Settings: microphone gain, audio source, `save_audio` + format `wav/ogg`, `target_language` (enabled per `model_info.languages` from server).
+    Other in-app settings are described below. They persist across restarts (`shared_preferences`; localStorage on Web).
   </TabItem>
 </Tabs>
 
+## Settings
+
+The Settings screen has two tabs — **Client** and **Server** — and every change is persisted across app restarts.
+
+### Client tab
+
+- **Microphone gain** — `0.0`–`3.0×` slider.
+- **Audio source (Android)** — Default, Voice recognition, Camcorder, Microphone, Voice communication, or Unprocessed.
+- **Save audio on this device** — desktop/mobile only. Writes the VAD speech of each session to one WAV file (16 kHz mono) so you can listen back to what was transcribed. The last saved path is shown in Settings.
+- **Record session audio (Web)** — Web only. Records the full microphone stream with the browser's `MediaRecorder` (WebM/Opus, MP4 fallback) and downloads the file when you stop. This is independent of the server recording and requires a browser with `MediaRecorder` support.
+- **Voice Activity Detection (VAD)** — frame size, positive/negative thresholds, redemption frames, pre-speech padding, minimum speech frames and end-speech padding, plus **Reset defaults**. Changes apply to the next recording.
+
+### Server tab
+
+- **Connection** — server address plus **Apply & reconnect**. Changing the address is disabled while recording; the client reconnects with exponential backoff and shows the live connection state.
+- **Active server model** — the loaded model and the languages it advertises.
+- **Server audio saving** — toggle plus `WAV` / `OGG` format. The server writes the recording to `records/` when the session is cleaned.
+- **Target language** — the full language picker. Options the active model does not advertise are disabled.
+- **Model manager** — lists every model compiled into the server, marks installed/active entries, and lets you **Download**, **Load/Reload** or **Delete** models. Downloads show a segmented progress bar (one section per file) plus aggregate bytes. Only one model operation runs at a time, and the active model cannot be deleted.
+
+See [Supported Models](/Sinsajo/reference/models/) for flags, languages and feature gates, and [Protocol](/Sinsajo/guides/protocol/#model-manager) for the underlying messages.
+
 ## Voice Activity Detection
 
-In `lib/services/audio_service.dart`:
+Defaults live in `lib/providers/settings_provider.dart` and are passed to `VadHandler.startListening()` in `lib/services/audio_service.dart`:
 
 ```dart
 await _vadHandler.startListening(
-  model: 'v5',
-  frameSamples: 512,
-  positiveSpeechThreshold: 0.5,
-  negativeSpeechThreshold: 0.35,
-  redemptionFrames: 8,
-  preSpeechPadFrames: 1,
-  minSpeechFrames: 3,
+  model: 'v5',                     // Silero VAD v5
+  frameSamples: 512,               // 32 ms
+  positiveSpeechThreshold: 0.45,   // start speech
+  negativeSpeechThreshold: 0.35,   // end speech
+  redemptionFrames: 7,             // silence frames to close an utterance
+  preSpeechPadFrames: 8,
+  minSpeechFrames: 8,
+  endSpeechPadFrames: 3,
 );
 ```
 
@@ -105,9 +128,17 @@ await _vadHandler.startListening(
 - Increase `redemptionFrames` to `12` to avoid cutting pauses
 - Package: [`vad` (pub.dev)](https://pub.dev/packages/vad) — Silero VAD v5 via ONNX Runtime
 
+You can change all of these from **Settings → Client → Voice Activity Detection**; no rebuild is needed.
+
 ## State & Protocol
 
-Riverpod 2.x manages WebSocket lifecycle and transcription state. Check `transcription_provider.dart` for `transcription`, `partial`, `final` and `model_info` handlers. See [Protocol](/Sinsajo/guides/protocol/) for the full WebSocket spec.
+Riverpod 2.x manages the WebSocket lifecycle, transcription state and the server model list:
+
+- `transcription_provider.dart` handles `transcription`, `partial`, `final` and `model_info`
+- `server_models_provider.dart` handles `model_list`, `model_action` and `model_download_progress`
+- `settings_provider.dart` persists client settings
+
+See [Protocol](/Sinsajo/guides/protocol/) for the full WebSocket spec.
 
 ## Choosing quickly
 
