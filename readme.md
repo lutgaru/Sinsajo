@@ -504,4 +504,4 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 ---
 
 **Status**: ✅ Functional - MVP Complete  
-**Version**: 1.0.0  
+**Version**: 1.2.0  
