@@ -35,6 +35,46 @@ jobs:
       - name: Test
         run: flutter test
 
+  # Build the Android app on every push/PR so Gradle, AGP, Java and signing
+  # issues are caught before a release. Uses the same release build as the
+  # release job, just without uploading the APK.
+  build-android:
+    if: github.event_name != 'release'
+    needs: ci
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: sinsajo_client
+    steps:
+      - uses: actions/checkout@v4
+
+      # Pin the JDK used by Gradle. ubuntu-latest now ships a newer Java than
+      # Gradle 8.14 supports (Java 25 requires Gradle 9.1+), so without this
+      # the build fails with "Java/Gradle incompatibility".
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      # act's default runner image does not ship the Android SDK that
+      # GitHub-hosted ubuntu-latest provides. Install it only for local act
+      # runs so GitHub CI keeps using the preinstalled SDK.
+      - name: Set up Android SDK (act only)
+        if: env.ACT
+        uses: android-actions/setup-android@v4
+        with:
+          packages: 'platform-tools platforms;android-36 build-tools;36.0.0'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Build Android APK
+        run: flutter build apk --release
+
   release-android:
     if: github.event_name == 'release' && startsWith(github.event.release.tag_name || '', 'client/')
     needs: ci
@@ -46,6 +86,19 @@ jobs:
         working-directory: sinsajo_client
     steps:
       - uses: actions/checkout@v4
+
+      # Keep the release build on the same supported JDK as CI.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      # Same act-only SDK bootstrap as the build job.
+      - name: Set up Android SDK (act only)
+        if: env.ACT
+        uses: android-actions/setup-android@v4
+        with:
+          packages: 'platform-tools platforms;android-36 build-tools;36.0.0'
 
       - uses: subosito/flutter-action@v2
         with:
