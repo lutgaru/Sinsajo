@@ -50,3 +50,47 @@ app.*.map.json
 /android/.gradle/
 /android/local.properties
 /ios
+
+# The native platform scaffolds above stay local-only, but the launcher icon
+# assets and Linux window-icon wiring are part of the product branding and must
+# be tracked so they survive a clean checkout. Keep these exceptions narrow.
+!/ios/
+/ios/*
+!/ios/Runner/
+/ios/Runner/*
+!/ios/Runner/Assets.xcassets/
+/ios/Runner/Assets.xcassets/*
+!/ios/Runner/Assets.xcassets/AppIcon.appiconset/
+!/ios/Runner/Assets.xcassets/AppIcon.appiconset/**
+!/ios/Runner/Assets.xcassets/LaunchImage.imageset/
+!/ios/Runner/Assets.xcassets/LaunchImage.imageset/**
+!/ios/Runner/Base.lproj/
+/ios/Runner/Base.lproj/*
+!/ios/Runner/Base.lproj/LaunchScreen.storyboard
+
+!/macos/
+/macos/*
+!/macos/Runner/
+/macos/Runner/*
+!/macos/Runner/Assets.xcassets/
+/macos/Runner/Assets.xcassets/*
+!/macos/Runner/Assets.xcassets/AppIcon.appiconset/
+!/macos/Runner/Assets.xcassets/AppIcon.appiconset/**
+
+!/windows/
+/windows/*
+!/windows/runner/
+/windows/runner/*
+!/windows/runner/resources/
+/windows/runner/resources/*
+!/windows/runner/resources/app_icon.ico
+
+!/linux/
+/linux/*
+!/linux/CMakeLists.txt
+!/linux/runner/
+/linux/runner/*
+!/linux/runner/my_application.cc
+!/linux/runner/resources/
+/linux/runner/resources/*
+!/linux/runner/resources/sinsajo.png
