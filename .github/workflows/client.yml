@@ -48,9 +48,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Pin the JDK used by Gradle. ubuntu-latest now ships a newer Java than
-      # Gradle 8.14 supports (Java 25 requires Gradle 9.1+), so without this
-      # the build fails with "Java/Gradle incompatibility".
+      # Pin the JDK used by Gradle to the version the Android project targets.
+      # Gradle 9.5 also supports newer JDKs, but pinning 17 keeps CI identical
+      # to the local toolchain and avoids "Java/Gradle incompatibility".
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
