@@ -1,0 +1,3 @@
+# Keep shell scripts LF so Git hooks also work from Windows (Git Bash).
+*.sh text eol=lf
+.githooks/* text eol=lf

@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+# Run checks for the projects touched by this commit.
+set -euo pipefail
+
+ROOT="$(git rev-parse --show-toplevel)"
+cd "$ROOT"
+
+if [[ "${SKIP_HOOKS:-0}" == "1" ]]; then
+  echo "⚠️  SKIP_HOOKS=1 set; skipping pre-commit checks."
+  exit 0
+fi
+
+staged="$(git diff --cached --name-only --diff-filter=ACMR)"
+if [[ -z "$staged" ]]; then
+  echo "No staged changes; skipping checks."
+  exit 0
+fi
+
+run_server=0
+run_client=0
+
+if grep -qE '^server/' <<< "$staged"; then
+  run_server=1
+fi
+if grep -qE '^sinsajo_client/' <<< "$staged"; then
+  run_client=1
+fi
+
+# Changes to the hook system itself should exercise everything.
+if grep -qE '^(check\.sh|setup-hooks\.sh|\.githooks/)' <<< "$staged"; then
+  run_server=1
+  run_client=1
+fi
+
+if [[ $run_server -eq 0 && $run_client -eq 0 ]]; then
+  echo "No server/client changes; skipping code checks."
+  exit 0
+fi
+
+args=()
+if [[ $run_server -eq 1 ]]; then
+  args+=(--server)
+fi
+if [[ $run_client -eq 1 ]]; then
+  args+=(--client)
+fi
+
+echo "🔍 Running pre-commit checks..."
+if ! ./check.sh "${args[@]}"; then
+  echo ""
+  echo "❌ Pre-commit checks failed."
+  echo "   Fix the issues above, or bypass with 'git commit --no-verify'."
+  exit 1
+fi
+
+echo "✅ Pre-commit checks passed."

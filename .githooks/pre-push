@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# Run the full check suite before sharing commits.
+set -euo pipefail
+
+ROOT="$(git rev-parse --show-toplevel)"
+cd "$ROOT"
+
+if [[ "${SKIP_HOOKS:-0}" == "1" ]]; then
+  echo "⚠️  SKIP_HOOKS=1 set; skipping pre-push checks."
+  exit 0
+fi
+
+echo "🔍 Running full pre-push checks..."
+if ! ./check.sh; then
+  echo ""
+  echo "❌ Pre-push checks failed."
+  echo "   Fix the issues above, or bypass with 'git push --no-verify'."
+  exit 1
+fi
+
+echo "✅ Pre-push checks passed."

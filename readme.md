@@ -374,6 +374,30 @@ Deploy: push to `master` triggers `.github/workflows/docs.yml` — builds Astro 
 
 ## 🛠️ Development
 
+### Local checks and Git hooks
+
+Install the repository hooks once:
+
+```bash
+./setup-hooks.sh
+```
+
+After that:
+
+- **pre-commit** checks only the project(s) touched by the commit (formatting, analysis, and tests).
+- **pre-push** runs the full check suite for both the server and the client.
+
+Run the same checks manually at any time:
+
+```bash
+./check.sh            # Rust server + Flutter client
+./check.sh --server   # Rust server only
+./check.sh --client   # Flutter client only
+./check.sh --build    # also run release builds
+```
+
+The client checks need `flutter` on `PATH` (or set `FLUTTER_BIN=/path/to/flutter`). In an emergency, bypass the hooks with `git commit --no-verify` / `git push --no-verify`, or set `SKIP_HOOKS=1`.
+
 ### Adding New Models
 
 Switch between supported models via `--model` (an unknown name prints the full list):
