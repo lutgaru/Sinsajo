@@ -7,7 +7,9 @@
 
 use crate::model::{Model, ModelDefinition, ModelFile};
 use std::path::Path;
-use transcribe_rs::whisperfile::{WhisperfileEngine, WhisperfileInferenceParams, WhisperfileLoadParams};
+use transcribe_rs::whisperfile::{
+    WhisperfileEngine, WhisperfileInferenceParams, WhisperfileLoadParams,
+};
 
 pub const DEFINITION_SMALL: ModelDefinition = ModelDefinition {
     name: "WhisperfileSmall",
@@ -26,13 +28,13 @@ pub const DEFINITION_SMALL: ModelDefinition = ModelDefinition {
 
 // Same 100-language set as Whisper multilingual.
 const SUPPORTED_LANGUAGES: &[&str] = &[
-    "en", "zh", "de", "es", "ru", "ko", "fr", "ja", "pt", "tr", "pl", "ca", "nl", "ar", "sv",
-    "it", "id", "hi", "fi", "vi", "he", "uk", "el", "ms", "cs", "ro", "da", "hu", "ta", "no",
-    "th", "ur", "hr", "bg", "lt", "la", "mi", "ml", "cy", "sk", "te", "fa", "lv", "bn", "sr",
-    "az", "sl", "kn", "et", "mk", "br", "eu", "is", "hy", "ne", "mn", "bs", "kk", "sq", "sw",
-    "gl", "mr", "pa", "si", "km", "sn", "yo", "so", "af", "oc", "ka", "be", "tg", "sd", "gu",
-    "am", "yi", "lo", "uz", "fo", "ht", "ps", "tk", "nn", "mt", "sa", "lb", "my", "bo", "tl",
-    "mg", "as", "tt", "haw", "ln", "ha", "ba", "jw", "su", "yue",
+    "en", "zh", "de", "es", "ru", "ko", "fr", "ja", "pt", "tr", "pl", "ca", "nl", "ar", "sv", "it",
+    "id", "hi", "fi", "vi", "he", "uk", "el", "ms", "cs", "ro", "da", "hu", "ta", "no", "th", "ur",
+    "hr", "bg", "lt", "la", "mi", "ml", "cy", "sk", "te", "fa", "lv", "bn", "sr", "az", "sl", "kn",
+    "et", "mk", "br", "eu", "is", "hy", "ne", "mn", "bs", "kk", "sq", "sw", "gl", "mr", "pa", "si",
+    "km", "sn", "yo", "so", "af", "oc", "ka", "be", "tg", "sd", "gu", "am", "yi", "lo", "uz", "fo",
+    "ht", "ps", "tk", "nn", "mt", "sa", "lb", "my", "bo", "tl", "mg", "as", "tt", "haw", "ln",
+    "ha", "ba", "jw", "su", "yue",
 ];
 
 pub struct Whisperfile {
@@ -76,9 +78,7 @@ impl Model for Whisperfile {
 fn binary_path(dir: &Path) -> std::path::PathBuf {
     let base = dir.join("whisperfile-0.9.3");
     // llamafile APE binaries need an `.exe` suffix on Windows.
-    if cfg!(windows) && !base.with_extension("exe").exists() && !base.exists() {
-        base.with_extension("exe")
-    } else if cfg!(windows) && base.with_extension("exe").exists() {
+    if cfg!(windows) && (base.with_extension("exe").exists() || !base.exists()) {
         base.with_extension("exe")
     } else {
         base

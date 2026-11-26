@@ -95,11 +95,9 @@ impl ModelFile {
                 repo,
                 self.remote_name()
             ))
-        } else if let Some(url) = self.url {
-            Some(url.to_string())
         } else {
             // No remote source: file must be placed manually.
-            None
+            self.url.map(|url| url.to_string())
         }
     }
 
@@ -226,11 +224,7 @@ pub fn get_model_info(name: &str) -> &'static ModelDefinition {
     eprintln!(
         "Unknown model '{}'. Valid models: {}",
         name,
-        MODELS
-            .iter()
-            .map(|m| m.name)
-            .collect::<Vec<_>>()
-            .join(", ")
+        MODELS.iter().map(|m| m.name).collect::<Vec<_>>().join(", ")
     );
     let gated: Vec<String> = GATED_WHISPER
         .iter()
@@ -274,15 +268,105 @@ pub fn is_supported_language_code(code: &str) -> bool {
     // unknown code is rejected rather than forwarded to a model.
     matches!(
         code.as_str(),
-        "en" | "zh" | "de" | "es" | "ru" | "ko" | "fr" | "ja" | "pt" | "tr" | "pl" | "ca"
-            | "nl" | "ar" | "sv" | "it" | "id" | "hi" | "fi" | "vi" | "he" | "uk" | "el"
-            | "ms" | "cs" | "ro" | "da" | "hu" | "ta" | "no" | "th" | "ur" | "hr" | "bg"
-            | "lt" | "la" | "mi" | "ml" | "cy" | "sk" | "te" | "fa" | "lv" | "bn" | "sr"
-            | "az" | "sl" | "kn" | "et" | "mk" | "br" | "eu" | "is" | "hy" | "ne" | "mn"
-            | "bs" | "kk" | "sq" | "sw" | "gl" | "mr" | "pa" | "si" | "km" | "sn" | "yo"
-            | "so" | "af" | "oc" | "ka" | "be" | "tg" | "sd" | "gu" | "am" | "yi" | "lo"
-            | "uz" | "fo" | "ht" | "ps" | "tk" | "nn" | "mt" | "sa" | "lb" | "my" | "bo"
-            | "tl" | "mg" | "as" | "tt" | "haw" | "ln" | "ha" | "ba" | "jw" | "su" | "yue"
+        "en" | "zh"
+            | "de"
+            | "es"
+            | "ru"
+            | "ko"
+            | "fr"
+            | "ja"
+            | "pt"
+            | "tr"
+            | "pl"
+            | "ca"
+            | "nl"
+            | "ar"
+            | "sv"
+            | "it"
+            | "id"
+            | "hi"
+            | "fi"
+            | "vi"
+            | "he"
+            | "uk"
+            | "el"
+            | "ms"
+            | "cs"
+            | "ro"
+            | "da"
+            | "hu"
+            | "ta"
+            | "no"
+            | "th"
+            | "ur"
+            | "hr"
+            | "bg"
+            | "lt"
+            | "la"
+            | "mi"
+            | "ml"
+            | "cy"
+            | "sk"
+            | "te"
+            | "fa"
+            | "lv"
+            | "bn"
+            | "sr"
+            | "az"
+            | "sl"
+            | "kn"
+            | "et"
+            | "mk"
+            | "br"
+            | "eu"
+            | "is"
+            | "hy"
+            | "ne"
+            | "mn"
+            | "bs"
+            | "kk"
+            | "sq"
+            | "sw"
+            | "gl"
+            | "mr"
+            | "pa"
+            | "si"
+            | "km"
+            | "sn"
+            | "yo"
+            | "so"
+            | "af"
+            | "oc"
+            | "ka"
+            | "be"
+            | "tg"
+            | "sd"
+            | "gu"
+            | "am"
+            | "yi"
+            | "lo"
+            | "uz"
+            | "fo"
+            | "ht"
+            | "ps"
+            | "tk"
+            | "nn"
+            | "mt"
+            | "sa"
+            | "lb"
+            | "my"
+            | "bo"
+            | "tl"
+            | "mg"
+            | "as"
+            | "tt"
+            | "haw"
+            | "ln"
+            | "ha"
+            | "ba"
+            | "jw"
+            | "su"
+            | "yue"
     )
 }
 
@@ -442,14 +526,23 @@ async fn download_inner(
     let target_dir = model_dir.join(definition.dir);
 
     if exists(definition, model_dir) {
-        println!("✓ Model '{}' found in '{}'", definition.display, definition.dir);
+        println!(
+            "✓ Model '{}' found in '{}'",
+            definition.display, definition.dir
+        );
         return Ok(());
     }
 
     if auto_download {
-        println!("📥 Model '{}' not found. Downloading...", definition.display);
+        println!(
+            "📥 Model '{}' not found. Downloading...",
+            definition.display
+        );
     } else {
-        println!("⚠ Model '{}' not found in '{}'", definition.display, definition.dir);
+        println!(
+            "⚠ Model '{}' not found in '{}'",
+            definition.display, definition.dir
+        );
         print!("Download model automatically? (y/N): ");
         std::io::stdout().flush().map_err(|e| e.to_string())?;
         let mut input = String::new();
@@ -614,7 +707,10 @@ async fn download_inner(
         }
     }
 
-    println!("✅ Model '{}' downloaded successfully to '{}'", definition.display, definition.dir);
+    println!(
+        "✅ Model '{}' downloaded successfully to '{}'",
+        definition.display, definition.dir
+    );
     Ok(())
 }
 
@@ -624,7 +720,12 @@ async fn remote_size(client: &Client, url: &str) -> Option<u64> {
     // HEAD is cheap and every current model host supports it. Some CDNs
     // answer without Content-Length, so fall back to a one-byte ranged GET
     // which reports the complete size in Content-Range.
-    if let Ok(response) = client.head(url).timeout(Duration::from_secs(10)).send().await {
+    if let Ok(response) = client
+        .head(url)
+        .timeout(Duration::from_secs(10))
+        .send()
+        .await
+    {
         if response.status().is_success() {
             if let Some(size) = response.content_length() {
                 return Some(size);
@@ -781,7 +882,11 @@ async fn download_and_extract(
     Ok(())
 }
 
-pub fn load_from_disk(name: &str, path: &Path) -> Result<Box<dyn Model>, Box<dyn std::error::Error + Send + Sync>> {    match name {
+pub fn load_from_disk(
+    name: &str,
+    path: &Path,
+) -> Result<Box<dyn Model>, Box<dyn std::error::Error + Send + Sync>> {
+    match name {
         "Canary180M" | "Canary1BFlash" | "Canary1BV2" => canary::load(path, name),
         "ParakeetTDT" => parakeet::load(path),
         "CohereInt4" | "CohereInt8" => cohere::load(path, name),
@@ -847,12 +952,16 @@ mod tests {
     }
 
     #[test]
-    fn language_union_covers_engine_spot_checks() {        for code in ["en", "es", "ru", "yue", "haw", "nn", "mt", "uk", "zh"] {
+    fn language_union_covers_engine_spot_checks() {
+        for code in ["en", "es", "ru", "yue", "haw", "nn", "mt", "uk", "zh"] {
             assert!(is_supported_language_code(code), "{code} should be known");
         }
         assert!(is_supported_language_code("ES"));
         for code in ["xx", "", "english"] {
-            assert!(!is_supported_language_code(code), "{code} should be rejected");
+            assert!(
+                !is_supported_language_code(code),
+                "{code} should be rejected"
+            );
         }
     }
 
@@ -895,7 +1004,11 @@ mod tests {
                 };
                 checked += 1;
 
-                assert!(url.starts_with("https://"), "{}: insecure url {url}", def.name);
+                assert!(
+                    url.starts_with("https://"),
+                    "{}: insecure url {url}",
+                    def.name
+                );
                 assert!(
                     !url["https://".len()..].contains("//") && !url.ends_with('/'),
                     "{}: malformed url {url}",

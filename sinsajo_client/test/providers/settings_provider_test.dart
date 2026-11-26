@@ -14,30 +14,25 @@ Future<void> _waitFor(FutureOr<bool> Function() condition) async {
 
 /// In-memory [SettingsStore] fake: writes land synchronously.
 class InMemorySettingsStore implements SettingsStore {
-  InMemorySettingsStore([Map<String, Object>? initial])
-      : data = {...?initial};
+  InMemorySettingsStore([Map<String, Object>? initial]) : data = {...?initial};
 
   final Map<String, Object> data;
 
   @override
-  Future<bool?> getBool(String key) async => data[key] is bool
-      ? data[key] as bool
-      : null;
+  Future<bool?> getBool(String key) async =>
+      data[key] is bool ? data[key] as bool : null;
 
   @override
-  Future<int?> getInt(String key) async => data[key] is int
-      ? data[key] as int
-      : null;
+  Future<int?> getInt(String key) async =>
+      data[key] is int ? data[key] as int : null;
 
   @override
-  Future<double?> getDouble(String key) async => data[key] is double
-      ? data[key] as double
-      : null;
+  Future<double?> getDouble(String key) async =>
+      data[key] is double ? data[key] as double : null;
 
   @override
-  Future<String?> getString(String key) async => data[key] is String
-      ? data[key] as String
-      : null;
+  Future<String?> getString(String key) async =>
+      data[key] is String ? data[key] as String : null;
 
   @override
   Future<void> setBool(String key, bool value) async {
@@ -118,9 +113,14 @@ void main() {
       final container = ProviderContainer();
       addTearDown(container.dispose);
 
-      container.read(settingsProvider.notifier).setTargetLanguage(TargetLanguage.portuguese);
+      container
+          .read(settingsProvider.notifier)
+          .setTargetLanguage(TargetLanguage.portuguese);
 
-      expect(container.read(settingsProvider).targetLanguage, TargetLanguage.portuguese);
+      expect(
+        container.read(settingsProvider).targetLanguage,
+        TargetLanguage.portuguese,
+      );
     });
 
     test('setSaveAudioLocal updates state', () {
@@ -155,26 +155,24 @@ void main() {
   group('Settings persistence', () {
     ProviderContainer containerWithStore(SettingsStore store) {
       final container = ProviderContainer(
-        overrides: [
-          settingsStoreProvider.overrideWithValue(store),
-        ],
+        overrides: [settingsStoreProvider.overrideWithValue(store)],
       );
       addTearDown(container.dispose);
       return container;
     }
 
     test('hydrates persisted values on start', () async {
-      final container = containerWithStore(InMemorySettingsStore({
-        'sinsajo.settings.micGain': 2.5,
-        'sinsajo.settings.ipAddress': '10.0.0.5',
-        'sinsajo.settings.targetLanguage': 'spanish',
-        'sinsajo.settings.frameSamples': 1024,
-        'sinsajo.settings.saveAudioLocal': true,
-      }));
-
-      await _waitFor(
-        () => container.read(settingsProvider).micGain == 2.5,
+      final container = containerWithStore(
+        InMemorySettingsStore({
+          'sinsajo.settings.micGain': 2.5,
+          'sinsajo.settings.ipAddress': '10.0.0.5',
+          'sinsajo.settings.targetLanguage': 'spanish',
+          'sinsajo.settings.frameSamples': 1024,
+          'sinsajo.settings.saveAudioLocal': true,
+        }),
       );
+
+      await _waitFor(() => container.read(settingsProvider).micGain == 2.5);
 
       final state = container.read(settingsProvider);
       expect(state.micGain, 2.5);
@@ -203,25 +201,23 @@ void main() {
     });
 
     test('unknown enum names fall back to defaults', () async {
-      final container = containerWithStore(InMemorySettingsStore({
-        'sinsajo.settings.micGain': 2.0,
-        'sinsajo.settings.targetLanguage': 'klingon',
-        'sinsajo.settings.audioSource': 'nope',
-      }));
+      final container = containerWithStore(
+        InMemorySettingsStore({
+          'sinsajo.settings.micGain': 2.0,
+          'sinsajo.settings.targetLanguage': 'klingon',
+          'sinsajo.settings.audioSource': 'nope',
+        }),
+      );
 
       // micGain proves hydration ran; enums must fall back, not crash.
-      await _waitFor(
-        () => container.read(settingsProvider).micGain == 2.0,
-      );
+      await _waitFor(() => container.read(settingsProvider).micGain == 2.0);
 
       final state = container.read(settingsProvider);
       expect(state.targetLanguage, TargetLanguage.english);
     });
 
     test('a user edit before hydration finishes is not clobbered', () async {
-      final store = InMemorySettingsStore({
-        'sinsajo.settings.micGain': 2.5,
-      });
+      final store = InMemorySettingsStore({'sinsajo.settings.micGain': 2.5});
       final container = containerWithStore(store);
 
       container.read(settingsProvider.notifier).setMicGain(1.5);

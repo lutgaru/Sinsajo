@@ -6,7 +6,8 @@
 // APIs don't exist. Selected with `dart.library.html` so `flutter build
 // web` compiles the real engine and native/VM builds get the stub.
 import 'web_session_recorder_stub.dart'
-    if (dart.library.html) 'web_session_recorder_web.dart' as impl;
+    if (dart.library.html) 'web_session_recorder_web.dart'
+    as impl;
 
 /// Records a transcription session in the browser.
 ///

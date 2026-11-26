@@ -3,6 +3,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
+
 import 'package:flutter/foundation.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
@@ -33,33 +34,33 @@ class WsService {
   WebSocketChannel? _channel;
   StreamSubscription? _sub;
 
-  final _statusController  = StreamController<WsStatus>.broadcast();
+  final _statusController = StreamController<WsStatus>.broadcast();
   final _messageController = StreamController<WsMessage>.broadcast();
 
-  Stream<WsStatus>   get statusStream  => _statusController.stream;
-  Stream<WsMessage>  get messageStream => _messageController.stream;
+  Stream<WsStatus> get statusStream => _statusController.stream;
+  Stream<WsMessage> get messageStream => _messageController.stream;
 
   WsStatus _status = WsStatus.disconnected;
   WsStatus get status => _status;
 
-  bool _isDisposed          = false;
+  bool _isDisposed = false;
   bool _intentionalDisconnect = false;
 
-  Timer?  _reconnectTimer;
-  Timer?  _connectTimer;
-  int     _reconnectAttempts = 0;
+  Timer? _reconnectTimer;
+  Timer? _connectTimer;
+  int _reconnectAttempts = 0;
   DateTime? _connectedAt;
 
   // Reconnection policy: exponential backoff with jitter, bounded.
   // This keeps the retry rate low so a crashed/restarting server is not
   // hammered by the client (network/device load stays minimal).
-  static const Duration _baseDelay       = Duration(seconds: 1);
-  static const Duration _maxDelay        = Duration(seconds: 15);
+  static const Duration _baseDelay = Duration(seconds: 1);
+  static const Duration _maxDelay = Duration(seconds: 15);
   static const Duration _stableThreshold = Duration(seconds: 10);
-  static const Duration _connectTimeout  = Duration(seconds: 8);
-  static const double   _jitterFactor    = 0.25; // +/-25% random jitter
-  final      Random    _random          = Random();
-  Duration   _currentDelay = _baseDelay;
+  static const Duration _connectTimeout = Duration(seconds: 8);
+  static const double _jitterFactor = 0.25; // +/-25% random jitter
+  final Random _random = Random();
+  Duration _currentDelay = _baseDelay;
 
   WsService({required this.url});
 
@@ -183,11 +184,13 @@ class WsService {
     _reconnectAttempts++;
 
     // Jitter avoids a thundering herd of clients reconnecting in sync.
-    final factor  = 1.0 + (_random.nextDouble() * 2 - 1) * _jitterFactor;
+    final factor = 1.0 + (_random.nextDouble() * 2 - 1) * _jitterFactor;
     final delayMs = (_currentDelay.inMilliseconds * factor).round();
-    debugPrint('[WS] 🔄 Reconnect attempt $_reconnectAttempts in '
-        '${(delayMs / 1000).toStringAsFixed(2)}s (backoff: '
-        '${_currentDelay.inMilliseconds}ms)');
+    debugPrint(
+      '[WS] 🔄 Reconnect attempt $_reconnectAttempts in '
+      '${(delayMs / 1000).toStringAsFixed(2)}s (backoff: '
+      '${_currentDelay.inMilliseconds}ms)',
+    );
 
     _reconnectTimer = Timer(Duration(milliseconds: delayMs), () {
       if (!_isDisposed && !_intentionalDisconnect) {
@@ -290,18 +293,16 @@ class WsService {
     }
 
     try {
-      final map  = jsonDecode(raw) as Map<String, dynamic>;
+      final map = jsonDecode(raw) as Map<String, dynamic>;
       final type = map['type'] as String? ?? 'unknown';
       final text = (map['text'] ?? map['message'] ?? '') as String;
       final model = map['model'] as String?;
-      final languages = (map['languages'] as List?)?.map((e) => e.toString()).toList();
-      _messageController.add(WsMessage(
-        type,
-        text,
-        model: model,
-        languages: languages,
-        data: map,
-      ));
+      final languages = (map['languages'] as List?)
+          ?.map((e) => e.toString())
+          .toList();
+      _messageController.add(
+        WsMessage(type, text, model: model, languages: languages, data: map),
+      );
     } catch (e) {
       debugPrint('[WS] ⚠ Error parsing message: $e');
     }

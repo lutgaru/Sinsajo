@@ -171,12 +171,10 @@ class SharedPreferencesSettingsStore implements SettingsStore {
   Future<int?> getInt(String key) async => await _prefs.getInt(key);
 
   @override
-  Future<double?> getDouble(String key) async =>
-      await _prefs.getDouble(key);
+  Future<double?> getDouble(String key) async => await _prefs.getDouble(key);
 
   @override
-  Future<String?> getString(String key) async =>
-      await _prefs.getString(key);
+  Future<String?> getString(String key) async => await _prefs.getString(key);
 
   @override
   Future<void> setBool(String key, bool value) async =>
@@ -209,10 +207,8 @@ const _kTargetLanguage = 'sinsajo.settings.targetLanguage';
 const _kSaveAudioLocal = 'sinsajo.settings.saveAudioLocal';
 const _kSaveAudioWeb = 'sinsajo.settings.saveAudioWeb';
 const _kFrameSamples = 'sinsajo.settings.frameSamples';
-const _kPositiveSpeechThreshold =
-    'sinsajo.settings.positiveSpeechThreshold';
-const _kNegativeSpeechThreshold =
-    'sinsajo.settings.negativeSpeechThreshold';
+const _kPositiveSpeechThreshold = 'sinsajo.settings.positiveSpeechThreshold';
+const _kNegativeSpeechThreshold = 'sinsajo.settings.negativeSpeechThreshold';
 const _kRedemptionFrames = 'sinsajo.settings.redemptionFrames';
 const _kPreSpeechPadFrames = 'sinsajo.settings.preSpeechPadFrames';
 const _kMinSpeechFrames = 'sinsajo.settings.minSpeechFrames';
@@ -269,26 +265,25 @@ class SettingsState {
     int? preSpeechPadFrames,
     int? minSpeechFrames,
     int? endSpeechPadFrames,
-  }) =>
-      SettingsState(
-        micGain: micGain ?? this.micGain,
-        audioSource: audioSource ?? this.audioSource,
-        ipAddress: ipAddress ?? this.ipAddress,
-        saveAudio: saveAudio ?? this.saveAudio,
-        audioFormat: audioFormat ?? this.audioFormat,
-        targetLanguage: targetLanguage ?? this.targetLanguage,
-        saveAudioLocal: saveAudioLocal ?? this.saveAudioLocal,
-        saveAudioWeb: saveAudioWeb ?? this.saveAudioWeb,
-        frameSamples: frameSamples ?? this.frameSamples,
-        positiveSpeechThreshold:
-            positiveSpeechThreshold ?? this.positiveSpeechThreshold,
-        negativeSpeechThreshold:
-            negativeSpeechThreshold ?? this.negativeSpeechThreshold,
-        redemptionFrames: redemptionFrames ?? this.redemptionFrames,
-        preSpeechPadFrames: preSpeechPadFrames ?? this.preSpeechPadFrames,
-        minSpeechFrames: minSpeechFrames ?? this.minSpeechFrames,
-        endSpeechPadFrames: endSpeechPadFrames ?? this.endSpeechPadFrames,
-      );
+  }) => SettingsState(
+    micGain: micGain ?? this.micGain,
+    audioSource: audioSource ?? this.audioSource,
+    ipAddress: ipAddress ?? this.ipAddress,
+    saveAudio: saveAudio ?? this.saveAudio,
+    audioFormat: audioFormat ?? this.audioFormat,
+    targetLanguage: targetLanguage ?? this.targetLanguage,
+    saveAudioLocal: saveAudioLocal ?? this.saveAudioLocal,
+    saveAudioWeb: saveAudioWeb ?? this.saveAudioWeb,
+    frameSamples: frameSamples ?? this.frameSamples,
+    positiveSpeechThreshold:
+        positiveSpeechThreshold ?? this.positiveSpeechThreshold,
+    negativeSpeechThreshold:
+        negativeSpeechThreshold ?? this.negativeSpeechThreshold,
+    redemptionFrames: redemptionFrames ?? this.redemptionFrames,
+    preSpeechPadFrames: preSpeechPadFrames ?? this.preSpeechPadFrames,
+    minSpeechFrames: minSpeechFrames ?? this.minSpeechFrames,
+    endSpeechPadFrames: endSpeechPadFrames ?? this.endSpeechPadFrames,
+  );
 }
 
 class SettingsNotifier extends Notifier<SettingsState> {
@@ -358,27 +353,26 @@ class SettingsNotifier extends Notifier<SettingsState> {
         positiveSpeechThreshold: _touched.contains(_kPositiveSpeechThreshold)
             ? current.positiveSpeechThreshold
             : await store.getDouble(_kPositiveSpeechThreshold) ??
-                current.positiveSpeechThreshold,
+                  current.positiveSpeechThreshold,
         negativeSpeechThreshold: _touched.contains(_kNegativeSpeechThreshold)
             ? current.negativeSpeechThreshold
             : await store.getDouble(_kNegativeSpeechThreshold) ??
-                current.negativeSpeechThreshold,
+                  current.negativeSpeechThreshold,
         redemptionFrames: _touched.contains(_kRedemptionFrames)
             ? current.redemptionFrames
             : await store.getInt(_kRedemptionFrames) ??
-                current.redemptionFrames,
+                  current.redemptionFrames,
         preSpeechPadFrames: _touched.contains(_kPreSpeechPadFrames)
             ? current.preSpeechPadFrames
             : await store.getInt(_kPreSpeechPadFrames) ??
-                current.preSpeechPadFrames,
+                  current.preSpeechPadFrames,
         minSpeechFrames: _touched.contains(_kMinSpeechFrames)
             ? current.minSpeechFrames
-            : await store.getInt(_kMinSpeechFrames) ??
-                current.minSpeechFrames,
+            : await store.getInt(_kMinSpeechFrames) ?? current.minSpeechFrames,
         endSpeechPadFrames: _touched.contains(_kEndSpeechPadFrames)
             ? current.endSpeechPadFrames
             : await store.getInt(_kEndSpeechPadFrames) ??
-                current.endSpeechPadFrames,
+                  current.endSpeechPadFrames,
       );
       if (!ref.mounted) return;
       state = loaded;
@@ -397,12 +391,14 @@ class SettingsNotifier extends Notifier<SettingsState> {
       debugPrint('[Settings] ⚠️ Could not persist setting: $e');
       return;
     }
-    unawaited(future.then(
-      (_) {},
-      onError: (Object e) {
-        debugPrint('[Settings] ⚠️ Could not persist setting: $e');
-      },
-    ));
+    unawaited(
+      future.then(
+        (_) {},
+        onError: (Object e) {
+          debugPrint('[Settings] ⚠️ Could not persist setting: $e');
+        },
+      ),
+    );
   }
 
   SettingsStore get _store => ref.read(settingsStoreProvider);
@@ -516,7 +512,6 @@ T _enumByName<T extends Enum>(List<T> values, String? name, T fallback) {
   return fallback;
 }
 
-final settingsProvider =
-    NotifierProvider<SettingsNotifier, SettingsState>(
+final settingsProvider = NotifierProvider<SettingsNotifier, SettingsState>(
   SettingsNotifier.new,
 );

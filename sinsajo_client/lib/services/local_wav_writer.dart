@@ -7,7 +7,8 @@
 import 'dart:typed_data';
 
 import 'local_wav_writer_stub.dart'
-    if (dart.library.io) 'local_wav_writer_io.dart' as impl;
+    if (dart.library.io) 'local_wav_writer_io.dart'
+    as impl;
 
 /// Writes 16-bit PCM speech bytes to a single `.wav` file, streaming
 /// chunk-by-chunk so RAM stays flat no matter how long the session is.
@@ -45,11 +46,10 @@ Future<LocalWavWriter> createLocalWavWriter({
   int sampleRate = 16000,
   int channels = 1,
   int bitsPerSample = 16,
-}) =>
-    impl.createWriter(
-      directoryPath: directoryPath,
-      fileName: fileName,
-      sampleRate: sampleRate,
-      channels: channels,
-      bitsPerSample: bitsPerSample,
-    );
+}) => impl.createWriter(
+  directoryPath: directoryPath,
+  fileName: fileName,
+  sampleRate: sampleRate,
+  channels: channels,
+  bitsPerSample: bitsPerSample,
+);

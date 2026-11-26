@@ -354,9 +354,7 @@ double downloadFractionFromProgress(Map<String, dynamic> data) {
       : (fileTotal > 0
             ? (fileDownloaded / fileTotal).clamp(0.0, 1.0).toDouble()
             : 0.0);
-  return ((filesDone + fileFraction) / filesTotal)
-      .clamp(0.0, 1.0)
-      .toDouble();
+  return ((filesDone + fileFraction) / filesTotal).clamp(0.0, 1.0).toDouble();
 }
 
 final serverModelsProvider =

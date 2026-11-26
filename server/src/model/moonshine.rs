@@ -1,6 +1,8 @@
 use crate::model::{Model, ModelArchive, ModelDefinition, ModelFile};
 use std::path::Path;
-use transcribe_rs::onnx::moonshine::{MoonshineModel, MoonshineParams, MoonshineVariant, StreamingModel};
+use transcribe_rs::onnx::moonshine::{
+    MoonshineModel, MoonshineParams, MoonshineVariant, StreamingModel,
+};
 use transcribe_rs::onnx::Quantization;
 
 // transcribe-rs layout (non-streaming):
@@ -9,9 +11,24 @@ use transcribe_rs::onnx::Quantization;
 //   encoder.onnx, decoder.onnx, streaming_config.json, tokenizer.json
 
 const NON_STREAMING_FILES: &[ModelFile] = &[
-    ModelFile { repo: None, url: None, remote: None, path: "encoder_model.onnx" },
-    ModelFile { repo: None, url: None, remote: None, path: "decoder_model_merged.onnx" },
-    ModelFile { repo: None, url: None, remote: None, path: "tokenizer.json" },
+    ModelFile {
+        repo: None,
+        url: None,
+        remote: None,
+        path: "encoder_model.onnx",
+    },
+    ModelFile {
+        repo: None,
+        url: None,
+        remote: None,
+        path: "decoder_model_merged.onnx",
+    },
+    ModelFile {
+        repo: None,
+        url: None,
+        remote: None,
+        path: "tokenizer.json",
+    },
 ];
 
 pub const DEFINITION_TINY: ModelDefinition = ModelDefinition {
@@ -102,10 +119,30 @@ pub const DEFINITION_STREAMING_TINY_EN: ModelDefinition = ModelDefinition {
     dir: "moonshine-tiny-streaming-en",
     display: "Moonshine Tiny Streaming (English)",
     files: &[
-        ModelFile { repo: None, url: None, remote: None, path: "encoder.onnx" },
-        ModelFile { repo: None, url: None, remote: None, path: "decoder.onnx" },
-        ModelFile { repo: None, url: None, remote: None, path: "streaming_config.json" },
-        ModelFile { repo: None, url: None, remote: None, path: "tokenizer.json" },
+        ModelFile {
+            repo: None,
+            url: None,
+            remote: None,
+            path: "encoder.onnx",
+        },
+        ModelFile {
+            repo: None,
+            url: None,
+            remote: None,
+            path: "decoder.onnx",
+        },
+        ModelFile {
+            repo: None,
+            url: None,
+            remote: None,
+            path: "streaming_config.json",
+        },
+        ModelFile {
+            repo: None,
+            url: None,
+            remote: None,
+            path: "tokenizer.json",
+        },
     ],
     archives: &[ModelArchive {
         url: "https://blob.handy.computer/moonshine-tiny-streaming-en.tar.gz",
@@ -144,8 +181,16 @@ pub struct Moonshine {
 }
 
 impl Moonshine {
-    pub fn new(inner: MoonshineModel, name: &'static str, languages: &'static [&'static str]) -> Self {
-        Self { inner, name, languages }
+    pub fn new(
+        inner: MoonshineModel,
+        name: &'static str,
+        languages: &'static [&'static str],
+    ) -> Self {
+        Self {
+            inner,
+            name,
+            languages,
+        }
     }
 }
 
@@ -204,14 +249,19 @@ impl Model for MoonshineStreaming {
     }
 }
 
-pub fn load(path: &Path, name: &str) -> Result<Box<dyn Model>, Box<dyn std::error::Error + Send + Sync>> {
+pub fn load(
+    path: &Path,
+    name: &str,
+) -> Result<Box<dyn Model>, Box<dyn std::error::Error + Send + Sync>> {
     let (variant, static_name, langs) = variant_for(name);
     let inner = MoonshineModel::load(path, variant, &Quantization::default())
         .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
     Ok(Box::new(Moonshine::new(inner, static_name, langs)))
 }
 
-pub fn load_streaming(path: &Path) -> Result<Box<dyn Model>, Box<dyn std::error::Error + Send + Sync>> {
+pub fn load_streaming(
+    path: &Path,
+) -> Result<Box<dyn Model>, Box<dyn std::error::Error + Send + Sync>> {
     // 4 threads matches the upstream streaming example.
     let inner = StreamingModel::load(path, 4, &Quantization::default())
         .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;

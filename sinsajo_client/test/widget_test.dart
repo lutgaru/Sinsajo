@@ -14,9 +14,7 @@ void main() {
 
   group('SinsajoApp', () {
     testWidgets('renders without crashing', (WidgetTester tester) async {
-      await tester.pumpWidget(
-        const ProviderScope(child: SinsajoApp()),
-      );
+      await tester.pumpWidget(const ProviderScope(child: SinsajoApp()));
       await tester.pump();
 
       expect(find.byType(MaterialApp), findsOneWidget);
@@ -24,9 +22,7 @@ void main() {
     });
 
     testWidgets('shows app title in AppBar', (WidgetTester tester) async {
-      await tester.pumpWidget(
-        const ProviderScope(child: SinsajoApp()),
-      );
+      await tester.pumpWidget(const ProviderScope(child: SinsajoApp()));
       await tester.pump();
 
       expect(find.text('Sinsajo client'), findsOneWidget);
@@ -34,58 +30,51 @@ void main() {
   });
 
   group('TranscriptionScreen', () {
-    testWidgets('shows initial prompt when not recording', (WidgetTester tester) async {
-      await tester.pumpWidget(
-        const ProviderScope(child: SinsajoApp()),
-      );
+    testWidgets('shows initial prompt when not recording', (
+      WidgetTester tester,
+    ) async {
+      await tester.pumpWidget(const ProviderScope(child: SinsajoApp()));
       await tester.pump();
 
-      expect(
-        find.text('Press the microphone to start'),
-        findsOneWidget,
-      );
+      expect(find.text('Press the microphone to start'), findsOneWidget);
     });
 
     testWidgets('shows microphone button', (WidgetTester tester) async {
-      await tester.pumpWidget(
-        const ProviderScope(child: SinsajoApp()),
-      );
+      await tester.pumpWidget(const ProviderScope(child: SinsajoApp()));
       await tester.pump();
 
       expect(find.byIcon(Icons.mic), findsOneWidget);
     });
 
     testWidgets('shows copy and clear buttons', (WidgetTester tester) async {
-      await tester.pumpWidget(
-        const ProviderScope(child: SinsajoApp()),
-      );
+      await tester.pumpWidget(const ProviderScope(child: SinsajoApp()));
       await tester.pump();
 
       expect(find.byIcon(Icons.copy), findsOneWidget);
       expect(find.byIcon(Icons.delete_outline), findsOneWidget);
     });
 
-    testWidgets('copy and clear buttons are disabled when no text', (WidgetTester tester) async {
-      await tester.pumpWidget(
-        const ProviderScope(child: SinsajoApp()),
-      );
+    testWidgets('copy and clear buttons are disabled when no text', (
+      WidgetTester tester,
+    ) async {
+      await tester.pumpWidget(const ProviderScope(child: SinsajoApp()));
       await tester.pump();
 
       // Find the copy and clear buttons by icon
-      final copyIcon  = find.byIcon(Icons.copy);
+      final copyIcon = find.byIcon(Icons.copy);
       final clearIcon = find.byIcon(Icons.delete_outline);
-      
-      expect(copyIcon,  findsOneWidget);
+
+      expect(copyIcon, findsOneWidget);
       expect(clearIcon, findsOneWidget);
-      
-      final copyButton  = tester.widget<IconButton>(
+
+      final copyButton = tester.widget<IconButton>(
         find.ancestor(of: copyIcon, matching: find.byType(IconButton)),
       );
       final clearButton = tester.widget<IconButton>(
         find.ancestor(of: clearIcon, matching: find.byType(IconButton)),
       );
-      
-      expect(copyButton.onPressed,  isNull);
+
+      expect(copyButton.onPressed, isNull);
       expect(clearButton.onPressed, isNull);
     });
   });
@@ -102,9 +91,7 @@ void main() {
     });
 
     test('fullText joins segments with spaces', () {
-      const state = TranscriptionState(
-        segments: ['Hola', 'mundo', 'test'],
-      );
+      const state = TranscriptionState(segments: ['Hola', 'mundo', 'test']);
 
       expect(state.fullText, 'Hola mundo test');
     });
@@ -128,9 +115,7 @@ void main() {
 
     test('copyWith appends segments', () {
       const state = TranscriptionState(segments: ['Hola']);
-      final newState = state.copyWith(
-        segments: [...state.segments, 'mundo'],
-      );
+      final newState = state.copyWith(segments: [...state.segments, 'mundo']);
 
       expect(newState.segments, ['Hola', 'mundo']);
       expect(newState.fullText, 'Hola mundo');

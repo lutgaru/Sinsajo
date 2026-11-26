@@ -8,11 +8,36 @@ pub const DEFINITION_INT4: ModelDefinition = ModelDefinition {
     dir: "cohere-transcribe-int4-onnx",
     display: "Cohere Transcribe (int4)",
     files: &[
-        ModelFile { repo: Some("cstr/cohere-transcribe-onnx-int4"), url: None, remote: None, path: "cohere-encoder.int4.onnx" },
-        ModelFile { repo: Some("cstr/cohere-transcribe-onnx-int4"), url: None, remote: None, path: "cohere-encoder.int4.onnx.data" },
-        ModelFile { repo: Some("cstr/cohere-transcribe-onnx-int4"), url: None, remote: None, path: "cohere-decoder.int4.onnx" },
-        ModelFile { repo: Some("cstr/cohere-transcribe-onnx-int4"), url: None, remote: None, path: "cohere-decoder.int4.onnx.data" },
-        ModelFile { repo: Some("cstr/cohere-transcribe-onnx-int4"), url: None, remote: None, path: "tokens.txt" },
+        ModelFile {
+            repo: Some("cstr/cohere-transcribe-onnx-int4"),
+            url: None,
+            remote: None,
+            path: "cohere-encoder.int4.onnx",
+        },
+        ModelFile {
+            repo: Some("cstr/cohere-transcribe-onnx-int4"),
+            url: None,
+            remote: None,
+            path: "cohere-encoder.int4.onnx.data",
+        },
+        ModelFile {
+            repo: Some("cstr/cohere-transcribe-onnx-int4"),
+            url: None,
+            remote: None,
+            path: "cohere-decoder.int4.onnx",
+        },
+        ModelFile {
+            repo: Some("cstr/cohere-transcribe-onnx-int4"),
+            url: None,
+            remote: None,
+            path: "cohere-decoder.int4.onnx.data",
+        },
+        ModelFile {
+            repo: Some("cstr/cohere-transcribe-onnx-int4"),
+            url: None,
+            remote: None,
+            path: "tokens.txt",
+        },
     ],
     archives: &[],
     executable: None,
@@ -27,10 +52,30 @@ pub const DEFINITION_INT8: ModelDefinition = ModelDefinition {
     // encoder has a sidecar `.data`. Listing a nonexistent file here causes a
     // 404 on download.
     files: &[
-        ModelFile { repo: Some("tristanripke/cohere-transcribe-onnx-int8"), url: None, remote: None, path: "cohere-encoder.int8.onnx" },
-        ModelFile { repo: Some("tristanripke/cohere-transcribe-onnx-int8"), url: None, remote: None, path: "cohere-encoder.int8.onnx.data" },
-        ModelFile { repo: Some("tristanripke/cohere-transcribe-onnx-int8"), url: None, remote: None, path: "cohere-decoder.int8.onnx" },
-        ModelFile { repo: Some("tristanripke/cohere-transcribe-onnx-int8"), url: None, remote: None, path: "tokens.txt" },
+        ModelFile {
+            repo: Some("tristanripke/cohere-transcribe-onnx-int8"),
+            url: None,
+            remote: None,
+            path: "cohere-encoder.int8.onnx",
+        },
+        ModelFile {
+            repo: Some("tristanripke/cohere-transcribe-onnx-int8"),
+            url: None,
+            remote: None,
+            path: "cohere-encoder.int8.onnx.data",
+        },
+        ModelFile {
+            repo: Some("tristanripke/cohere-transcribe-onnx-int8"),
+            url: None,
+            remote: None,
+            path: "cohere-decoder.int8.onnx",
+        },
+        ModelFile {
+            repo: Some("tristanripke/cohere-transcribe-onnx-int8"),
+            url: None,
+            remote: None,
+            path: "tokens.txt",
+        },
     ],
     archives: &[],
     executable: None,
@@ -49,7 +94,11 @@ pub struct Cohere {
 
 impl Cohere {
     pub fn new(inner: CohereModel, name: &'static str, quantization: Quantization) -> Self {
-        Self { inner, name, quantization }
+        Self {
+            inner,
+            name,
+            quantization,
+        }
     }
 }
 
@@ -84,7 +133,10 @@ impl Model for Cohere {
     }
 }
 
-pub fn load(path: &Path, name: &str) -> Result<Box<dyn Model>, Box<dyn std::error::Error + Send + Sync>> {
+pub fn load(
+    path: &Path,
+    name: &str,
+) -> Result<Box<dyn Model>, Box<dyn std::error::Error + Send + Sync>> {
     let (static_name, quant) = match name {
         "CohereInt8" => ("CohereInt8", Quantization::Int8),
         _ => ("CohereInt4", Quantization::Int4),

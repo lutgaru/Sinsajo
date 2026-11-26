@@ -1,4 +1,5 @@
 import 'dart:convert';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sinsajo_client/services/ws_service.dart';
 
@@ -12,7 +13,7 @@ void main() {
       final service = WsService(url: 'ws://localhost:8765');
 
       expect(service.status, WsStatus.disconnected);
-      
+
       service.dispose();
     });
 

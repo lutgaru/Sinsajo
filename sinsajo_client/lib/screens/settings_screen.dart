@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:record/record.dart';
+
 import '../providers/server_models_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/transcription_provider.dart';
@@ -255,9 +256,8 @@ class _ClientSettingsTab extends ConsumerWidget {
             ),
             Text(
               'Tuning how speech is detected. Lower thresholds react to quieter voices; higher frame counts make detection more stable. Changes apply to the next recording.',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Theme.of(context).colorScheme.outline,
-              ),
+              style: Theme.of(context).textTheme.bodySmall
+                  ?.copyWith(color: Theme.of(context).colorScheme.outline),
             ),
             const SizedBox(height: 12),
             Text(
@@ -397,9 +397,8 @@ class _ServerSettingsTab extends ConsumerWidget {
                 padding: const EdgeInsets.only(top: 8),
                 child: Text(
                   'Stop recording before changing the server address.',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.outline,
-                  ),
+                  style: Theme.of(context).textTheme.bodySmall
+                      ?.copyWith(color: Theme.of(context).colorScheme.outline),
                 ),
               ),
             const SizedBox(height: 24),
@@ -408,7 +407,7 @@ class _ServerSettingsTab extends ConsumerWidget {
               subtitle: activeModel == null
                   ? 'Not connected'
                   : '$activeModel'
-                      '${supportedLanguages != null ? ' • ${supportedLanguages.length} languages' : ''}',
+                        '${supportedLanguages != null ? ' • ${supportedLanguages.length} languages' : ''}',
             ),
             const SizedBox(height: 8),
             _InfoCard(
@@ -421,8 +420,7 @@ class _ServerSettingsTab extends ConsumerWidget {
             const SizedBox(height: 24),
             _SectionTitle(
               title: 'Server audio saving',
-              subtitle:
-                  'Controls the recordings the server keeps. Applies to the next session.',
+              subtitle: 'Controls the recordings the server keeps. Applies to the next session.',
             ),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
@@ -461,8 +459,7 @@ class _ServerSettingsTab extends ConsumerWidget {
             const SizedBox(height: 24),
             _SectionTitle(
               title: 'Target language',
-              subtitle:
-                  'Language the server model writes. Applies to the next session.',
+              subtitle: 'Language the server model writes. Applies to the next session.',
             ),
             const SizedBox(height: 8),
             DropdownButtonFormField<TargetLanguage>(
@@ -556,8 +553,7 @@ class _ServerSettingsTab extends ConsumerWidget {
               const _InfoCard(
                 icon: Icons.inbox_outlined,
                 title: 'No models reported',
-                subtitle:
-                    'This server build did not report any models. Check the server logs.',
+                subtitle: 'This server build did not report any models. Check the server logs.',
               )
             else
               ...models.models.map(
@@ -721,9 +717,8 @@ class _SectionTitle extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             subtitle!,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: Theme.of(context).colorScheme.outline,
-            ),
+            style: Theme.of(context).textTheme.bodySmall
+                ?.copyWith(color: Theme.of(context).colorScheme.outline),
           ),
         ],
       ],
@@ -811,9 +806,8 @@ class _ActionBanner extends StatelessWidget {
           Expanded(
             child: Text(
               message,
-              style: Theme.of(
-                context,
-              ).textTheme.bodySmall?.copyWith(color: onColor),
+              style: Theme.of(context).textTheme.bodySmall
+                  ?.copyWith(color: onColor),
             ),
           ),
           if (onDismiss != null)
@@ -961,9 +955,9 @@ class _ModelCard extends StatelessWidget {
                 Chip(
                   label: const Text('Active'),
                   visualDensity: VisualDensity.compact,
-                  backgroundColor: Theme.of(
-                    context,
-                  ).colorScheme.primaryContainer,
+                  backgroundColor: Theme.of(context)
+                      .colorScheme
+                      .primaryContainer,
                   labelStyle: TextStyle(
                     color: Theme.of(context).colorScheme.onPrimaryContainer,
                     fontSize: 11,
@@ -972,9 +966,8 @@ class _ModelCard extends StatelessWidget {
               else
                 Text(
                   model.installed ? 'Installed' : 'Not installed',
-                  style: Theme.of(
-                    context,
-                  ).textTheme.labelSmall?.copyWith(color: statusColor),
+                  style: Theme.of(context).textTheme.labelSmall
+                      ?.copyWith(color: statusColor),
                 ),
             ],
           ),
@@ -996,9 +989,8 @@ class _ModelCard extends StatelessWidget {
             const SizedBox(height: 2),
             Text(
               _downloadLabel(state),
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Theme.of(context).colorScheme.outline,
-              ),
+              style: Theme.of(context).textTheme.bodySmall
+                  ?.copyWith(color: Theme.of(context).colorScheme.outline),
             ),
           ],
           if (isThisLoading || isThisDeleting) ...[
@@ -1015,9 +1007,8 @@ class _ModelCard extends StatelessWidget {
                   isThisDeleting
                       ? 'Removing model files…'
                       : 'Loading model on the server…',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.outline,
-                  ),
+                  style: Theme.of(context).textTheme.bodySmall
+                      ?.copyWith(color: Theme.of(context).colorScheme.outline),
                 ),
               ],
             ),

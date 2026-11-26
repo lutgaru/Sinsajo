@@ -22,9 +22,7 @@ void main() {
     });
 
     test('clear transcription resets segments', () {
-      var state = const TranscriptionState(
-        segments: ['Hello', 'world'],
-      );
+      var state = const TranscriptionState(segments: ['Hello', 'world']);
 
       expect(state.fullText, 'Hello world');
 

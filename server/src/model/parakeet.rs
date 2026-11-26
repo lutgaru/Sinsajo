@@ -10,14 +10,54 @@ pub const DEFINITION: ModelDefinition = ModelDefinition {
     dir: "parakeet-tdt-0.6b-v3-onnx",
     display: "Parakeet TDT 0.6b v3",
     files: &[
-        ModelFile { repo: Some("istupakov/parakeet-tdt-0.6b-v3-onnx"), url: None, remote: None, path: "config.json" },
-        ModelFile { repo: Some("istupakov/parakeet-tdt-0.6b-v3-onnx"), url: None, remote: None, path: "decoder_joint-model.int8.onnx" },
-        ModelFile { repo: Some("istupakov/parakeet-tdt-0.6b-v3-onnx"), url: None, remote: None, path: "decoder_joint-model.onnx" },
-        ModelFile { repo: Some("istupakov/parakeet-tdt-0.6b-v3-onnx"), url: None, remote: None, path: "encoder-model.int8.onnx" },
-        ModelFile { repo: Some("istupakov/parakeet-tdt-0.6b-v3-onnx"), url: None, remote: None, path: "encoder-model.onnx" },
-        ModelFile { repo: Some("istupakov/parakeet-tdt-0.6b-v3-onnx"), url: None, remote: None, path: "encoder-model.onnx.data" },
-        ModelFile { repo: Some("istupakov/parakeet-tdt-0.6b-v3-onnx"), url: None, remote: None, path: "nemo128.onnx" },
-        ModelFile { repo: Some("istupakov/parakeet-tdt-0.6b-v3-onnx"), url: None, remote: None, path: "vocab.txt" },
+        ModelFile {
+            repo: Some("istupakov/parakeet-tdt-0.6b-v3-onnx"),
+            url: None,
+            remote: None,
+            path: "config.json",
+        },
+        ModelFile {
+            repo: Some("istupakov/parakeet-tdt-0.6b-v3-onnx"),
+            url: None,
+            remote: None,
+            path: "decoder_joint-model.int8.onnx",
+        },
+        ModelFile {
+            repo: Some("istupakov/parakeet-tdt-0.6b-v3-onnx"),
+            url: None,
+            remote: None,
+            path: "decoder_joint-model.onnx",
+        },
+        ModelFile {
+            repo: Some("istupakov/parakeet-tdt-0.6b-v3-onnx"),
+            url: None,
+            remote: None,
+            path: "encoder-model.int8.onnx",
+        },
+        ModelFile {
+            repo: Some("istupakov/parakeet-tdt-0.6b-v3-onnx"),
+            url: None,
+            remote: None,
+            path: "encoder-model.onnx",
+        },
+        ModelFile {
+            repo: Some("istupakov/parakeet-tdt-0.6b-v3-onnx"),
+            url: None,
+            remote: None,
+            path: "encoder-model.onnx.data",
+        },
+        ModelFile {
+            repo: Some("istupakov/parakeet-tdt-0.6b-v3-onnx"),
+            url: None,
+            remote: None,
+            path: "nemo128.onnx",
+        },
+        ModelFile {
+            repo: Some("istupakov/parakeet-tdt-0.6b-v3-onnx"),
+            url: None,
+            remote: None,
+            path: "vocab.txt",
+        },
     ],
     archives: &[],
     executable: None,
@@ -52,10 +92,16 @@ impl Model for ParakeetTDT {
     ) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
         // Parakeet is English-only and does not support translation; the
         // target language is accepted for protocol compatibility but ignored.
-        let result = self.inner.transcribe(samples, &TranscribeOptions {
-            language: Some("en".to_string()),
-            ..Default::default()
-        }).map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
+        let result = self
+            .inner
+            .transcribe(
+                samples,
+                &TranscribeOptions {
+                    language: Some("en".to_string()),
+                    ..Default::default()
+                },
+            )
+            .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
         Ok(result.text.trim().to_string())
     }
 }

@@ -9,13 +9,48 @@ pub const DEFINITION_180M: ModelDefinition = ModelDefinition {
     dir: "canary-180m-flash-onnx",
     display: "Canary 180M Flash",
     files: &[
-        ModelFile { repo: Some("istupakov/canary-180m-flash-onnx"), url: None, remote: None, path: "config.json" },
-        ModelFile { repo: Some("istupakov/canary-180m-flash-onnx"), url: None, remote: None, path: "decoder-model.int8.onnx" },
-        ModelFile { repo: Some("istupakov/canary-180m-flash-onnx"), url: None, remote: None, path: "decoder-model.onnx" },
-        ModelFile { repo: Some("istupakov/canary-180m-flash-onnx"), url: None, remote: None, path: "encoder-model.int8.onnx" },
-        ModelFile { repo: Some("istupakov/canary-180m-flash-onnx"), url: None, remote: None, path: "encoder-model.onnx" },
-        ModelFile { repo: Some("istupakov/canary-180m-flash-onnx"), url: None, remote: None, path: "vocab.txt" },
-        ModelFile { repo: Some("istupakov/parakeet-tdt-0.6b-v3-onnx"), url: None, remote: None, path: "nemo128.onnx" },
+        ModelFile {
+            repo: Some("istupakov/canary-180m-flash-onnx"),
+            url: None,
+            remote: None,
+            path: "config.json",
+        },
+        ModelFile {
+            repo: Some("istupakov/canary-180m-flash-onnx"),
+            url: None,
+            remote: None,
+            path: "decoder-model.int8.onnx",
+        },
+        ModelFile {
+            repo: Some("istupakov/canary-180m-flash-onnx"),
+            url: None,
+            remote: None,
+            path: "decoder-model.onnx",
+        },
+        ModelFile {
+            repo: Some("istupakov/canary-180m-flash-onnx"),
+            url: None,
+            remote: None,
+            path: "encoder-model.int8.onnx",
+        },
+        ModelFile {
+            repo: Some("istupakov/canary-180m-flash-onnx"),
+            url: None,
+            remote: None,
+            path: "encoder-model.onnx",
+        },
+        ModelFile {
+            repo: Some("istupakov/canary-180m-flash-onnx"),
+            url: None,
+            remote: None,
+            path: "vocab.txt",
+        },
+        ModelFile {
+            repo: Some("istupakov/parakeet-tdt-0.6b-v3-onnx"),
+            url: None,
+            remote: None,
+            path: "nemo128.onnx",
+        },
     ],
     archives: &[],
     executable: None,
@@ -26,13 +61,48 @@ pub const DEFINITION_1B_FLASH: ModelDefinition = ModelDefinition {
     dir: "canary-1b-flash-onnx",
     display: "Canary 1B Flash",
     files: &[
-        ModelFile { repo: Some("istupakov/canary-1b-flash-onnx"), url: None, remote: None, path: "config.json" },
-        ModelFile { repo: Some("istupakov/canary-1b-flash-onnx"), url: None, remote: None, path: "decoder-model.int8.onnx" },
-        ModelFile { repo: Some("istupakov/canary-1b-flash-onnx"), url: None, remote: None, path: "decoder-model.onnx" },
-        ModelFile { repo: Some("istupakov/canary-1b-flash-onnx"), url: None, remote: None, path: "encoder-model.int8.onnx" },
-        ModelFile { repo: Some("istupakov/canary-1b-flash-onnx"), url: None, remote: None, path: "encoder-model.onnx" },
-        ModelFile { repo: Some("istupakov/canary-1b-flash-onnx"), url: None, remote: None, path: "vocab.txt" },
-        ModelFile { repo: Some("istupakov/parakeet-tdt-0.6b-v3-onnx"), url: None, remote: None, path: "nemo128.onnx" },
+        ModelFile {
+            repo: Some("istupakov/canary-1b-flash-onnx"),
+            url: None,
+            remote: None,
+            path: "config.json",
+        },
+        ModelFile {
+            repo: Some("istupakov/canary-1b-flash-onnx"),
+            url: None,
+            remote: None,
+            path: "decoder-model.int8.onnx",
+        },
+        ModelFile {
+            repo: Some("istupakov/canary-1b-flash-onnx"),
+            url: None,
+            remote: None,
+            path: "decoder-model.onnx",
+        },
+        ModelFile {
+            repo: Some("istupakov/canary-1b-flash-onnx"),
+            url: None,
+            remote: None,
+            path: "encoder-model.int8.onnx",
+        },
+        ModelFile {
+            repo: Some("istupakov/canary-1b-flash-onnx"),
+            url: None,
+            remote: None,
+            path: "encoder-model.onnx",
+        },
+        ModelFile {
+            repo: Some("istupakov/canary-1b-flash-onnx"),
+            url: None,
+            remote: None,
+            path: "vocab.txt",
+        },
+        ModelFile {
+            repo: Some("istupakov/parakeet-tdt-0.6b-v3-onnx"),
+            url: None,
+            remote: None,
+            path: "nemo128.onnx",
+        },
     ],
     archives: &[],
     executable: None,
@@ -43,13 +113,48 @@ pub const DEFINITION_1B_V2: ModelDefinition = ModelDefinition {
     dir: "canary-1b-v2-onnx",
     display: "Canary 1B v2 (25 languages)",
     files: &[
-        ModelFile { repo: Some("istupakov/canary-1b-v2-onnx"), url: None, remote: None, path: "config.json" },
-        ModelFile { repo: Some("istupakov/canary-1b-v2-onnx"), url: None, remote: None, path: "decoder-model.int8.onnx" },
-        ModelFile { repo: Some("istupakov/canary-1b-v2-onnx"), url: None, remote: None, path: "decoder-model.onnx" },
-        ModelFile { repo: Some("istupakov/canary-1b-v2-onnx"), url: None, remote: None, path: "encoder-model.int8.onnx" },
-        ModelFile { repo: Some("istupakov/canary-1b-v2-onnx"), url: None, remote: None, path: "encoder-model.onnx" },
-        ModelFile { repo: Some("istupakov/canary-1b-v2-onnx"), url: None, remote: None, path: "vocab.txt" },
-        ModelFile { repo: Some("istupakov/parakeet-tdt-0.6b-v3-onnx"), url: None, remote: None, path: "nemo128.onnx" },
+        ModelFile {
+            repo: Some("istupakov/canary-1b-v2-onnx"),
+            url: None,
+            remote: None,
+            path: "config.json",
+        },
+        ModelFile {
+            repo: Some("istupakov/canary-1b-v2-onnx"),
+            url: None,
+            remote: None,
+            path: "decoder-model.int8.onnx",
+        },
+        ModelFile {
+            repo: Some("istupakov/canary-1b-v2-onnx"),
+            url: None,
+            remote: None,
+            path: "decoder-model.onnx",
+        },
+        ModelFile {
+            repo: Some("istupakov/canary-1b-v2-onnx"),
+            url: None,
+            remote: None,
+            path: "encoder-model.int8.onnx",
+        },
+        ModelFile {
+            repo: Some("istupakov/canary-1b-v2-onnx"),
+            url: None,
+            remote: None,
+            path: "encoder-model.onnx",
+        },
+        ModelFile {
+            repo: Some("istupakov/canary-1b-v2-onnx"),
+            url: None,
+            remote: None,
+            path: "vocab.txt",
+        },
+        ModelFile {
+            repo: Some("istupakov/parakeet-tdt-0.6b-v3-onnx"),
+            url: None,
+            remote: None,
+            path: "nemo128.onnx",
+        },
     ],
     archives: &[],
     executable: None,
@@ -65,8 +170,8 @@ pub const DEFINITION: ModelDefinition = DEFINITION_180M;
 // client only enables languages that actually work.
 const SUPPORTED_LANGUAGES_FLASH: &[&str] = &["en", "de", "es", "fr"];
 const SUPPORTED_LANGUAGES_V2: &[&str] = &[
-    "bg", "hr", "cs", "da", "nl", "en", "et", "fi", "fr", "de", "el", "hu", "it", "lv", "lt",
-    "mt", "pl", "pt", "ro", "sk", "sl", "es", "sv", "ru", "uk",
+    "bg", "hr", "cs", "da", "nl", "en", "et", "fi", "fr", "de", "el", "hu", "it", "lv", "lt", "mt",
+    "pl", "pt", "ro", "sk", "sl", "es", "sv", "ru", "uk",
 ];
 
 pub struct Canary {
@@ -77,7 +182,11 @@ pub struct Canary {
 
 impl Canary {
     pub fn new(inner: CanaryModel, name: &'static str, languages: &'static [&'static str]) -> Self {
-        Self { inner, name, languages }
+        Self {
+            inner,
+            name,
+            languages,
+        }
     }
 }
 
@@ -117,7 +226,10 @@ impl Model for Canary {
     }
 }
 
-pub fn load(path: &Path, name: &str) -> Result<Box<dyn Model>, Box<dyn std::error::Error + Send + Sync>> {
+pub fn load(
+    path: &Path,
+    name: &str,
+) -> Result<Box<dyn Model>, Box<dyn std::error::Error + Send + Sync>> {
     let inner = CanaryModel::load(path, &Quantization::Int8)
         .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
     let (static_name, langs) = match name {

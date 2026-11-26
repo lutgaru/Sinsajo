@@ -1,6 +1,5 @@
 use clap::Parser;
 use futures_util::{SinkExt, StreamExt};
-use hound;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io::Write;
@@ -19,7 +18,11 @@ mod config;
 mod model;
 
 #[derive(Parser)]
-#[command(name = "sinsajo-server", version, about = "Speech-to-text WebSocket server")]
+#[command(
+    name = "sinsajo-server",
+    version,
+    about = "Speech-to-text WebSocket server"
+)]
 struct Args {
     /// Model name (e.g. ParakeetTDT, Canary180M, Canary1BV2, CohereInt4,
     /// SenseVoice, GigaAM, MoonshineBase, WhisperSmall, WhisperfileSmall).
@@ -781,7 +784,9 @@ async fn handle_connection(
                     Some(Ok(Message::Binary(data))) => {
                         // Decode PCM i16 → f32
                         let samples: Vec<f32> = data
-                            .chunks_exact(2)
+                            .as_chunks::<2>()
+                            .0
+                            .iter()
                             .map(|b| i16::from_le_bytes([b[0], b[1]]) as f32 / 32768.0)
                             .collect();
 

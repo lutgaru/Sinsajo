@@ -4,6 +4,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
+
 import '../providers/transcription_provider.dart';
 import '../services/ws_service.dart';
 import 'help_screen.dart';
@@ -19,7 +20,6 @@ class TranscriptionScreen extends ConsumerStatefulWidget {
 
 class _TranscriptionScreenState extends ConsumerState<TranscriptionScreen>
     with WidgetsBindingObserver {
-
   @override
   void initState() {
     super.initState();
@@ -41,10 +41,13 @@ class _TranscriptionScreenState extends ConsumerState<TranscriptionScreen>
 
   @override
   Widget build(BuildContext context) {
-    final state    = ref.watch(transcriptionProvider);
+    final state = ref.watch(transcriptionProvider);
     final notifier = ref.read(transcriptionProvider.notifier);
 
-    ref.listen(transcriptionProvider.select((s) => s.isRecording), (prev, next) {
+    ref.listen(transcriptionProvider.select((s) => s.isRecording), (
+      prev,
+      next,
+    ) {
       if (next) {
         WakelockPlus.enable();
       } else {
@@ -59,18 +62,17 @@ class _TranscriptionScreenState extends ConsumerState<TranscriptionScreen>
           IconButton(
             icon: const Icon(Icons.help_outline),
             onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const HelpScreen()),
-              );
+              Navigator.of(context)
+                  .push(MaterialPageRoute(builder: (_) => const HelpScreen()));
             },
             tooltip: 'Help',
           ),
           IconButton(
             icon: const Icon(Icons.settings),
             onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const SettingsScreen()),
-              );
+              Navigator.of(
+                context,
+              ).push(MaterialPageRoute(builder: (_) => const SettingsScreen()));
             },
             tooltip: 'Settings',
           ),
@@ -92,11 +94,10 @@ class _TranscriptionScreenState extends ConsumerState<TranscriptionScreen>
                         state.isPaused
                             ? 'Paused'
                             : state.isRecording
-                                ? 'Listening…'
-                                : 'Press the microphone to start',
-                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                              color: Colors.white38,
-                            ),
+                            ? 'Listening…'
+                            : 'Press the microphone to start',
+                        style: Theme.of(context).textTheme.bodyLarge
+                            ?.copyWith(color: Colors.white38),
                       ),
                     )
                   : SingleChildScrollView(
@@ -127,9 +128,7 @@ class _TranscriptionScreenState extends ConsumerState<TranscriptionScreen>
                     InkWell(
                       onTap: () {
                         Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => const HelpScreen(),
-                          ),
+                          MaterialPageRoute(builder: (_) => const HelpScreen()),
                         );
                       },
                       child: const Padding(
@@ -162,8 +161,8 @@ class _TranscriptionScreenState extends ConsumerState<TranscriptionScreen>
 class _ControlBar extends StatelessWidget {
   const _ControlBar({required this.state, required this.notifier});
 
-  final TranscriptionState      state;
-  final TranscriptionNotifier   notifier;
+  final TranscriptionState state;
+  final TranscriptionNotifier notifier;
 
   @override
   Widget build(BuildContext context) {
@@ -211,7 +210,7 @@ class _ControlBar extends StatelessWidget {
                             color: Colors.red.withValues(alpha: 0.5),
                             blurRadius: 20,
                             spreadRadius: 4,
-                          )
+                          ),
                         ]
                       : [],
                 ),
@@ -297,18 +296,15 @@ class _WsStatusDot extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final (color, label) = switch (status) {
-      WsStatus.connected    => (Colors.greenAccent, 'Connected'),
-      WsStatus.connecting   => (Colors.orange, 'Connecting'),
-      WsStatus.error        => (Colors.red, 'Error'),
+      WsStatus.connected => (Colors.greenAccent, 'Connected'),
+      WsStatus.connecting => (Colors.orange, 'Connecting'),
+      WsStatus.error => (Colors.red, 'Error'),
       WsStatus.disconnected => (Colors.grey, 'Disconnected'),
     };
 
     return Tooltip(
       message: label,
-      child: CircleAvatar(
-        radius: 6,
-        backgroundColor: color,
-      ),
+      child: CircleAvatar(radius: 6, backgroundColor: color),
     );
   }
 }

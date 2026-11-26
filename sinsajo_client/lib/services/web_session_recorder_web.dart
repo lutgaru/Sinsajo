@@ -41,9 +41,7 @@ class _WebMediaRecorder implements WebSessionRecorder {
       // context), since the getter is typed non-nullable.
       mediaDevices = web.window.navigator.mediaDevices;
     } catch (_) {
-      throw StateError(
-        'Microphone capture is not available in this browser.',
-      );
+      throw StateError('Microphone capture is not available in this browser.');
     }
     final mime = _pickMimeType();
     if (mime == null) {
@@ -67,10 +65,7 @@ class _WebMediaRecorder implements WebSessionRecorder {
     _stopCompleter = Completer<web.Blob>();
     final recorder = web.MediaRecorder(
       stream,
-      web.MediaRecorderOptions(
-        mimeType: mime,
-        audioBitsPerSecond: 32000,
-      ),
+      web.MediaRecorderOptions(mimeType: mime, audioBitsPerSecond: 32000),
     );
     recorder.ondataavailable = ((web.BlobEvent event) {
       if (event.data.size > 0) _parts.add(event.data);

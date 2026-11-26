@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:typed_data';
+
 import 'package:flutter/foundation.dart';
 import 'package:record/record.dart';
 import 'package:vad/vad.dart';
@@ -65,9 +66,7 @@ class AudioService {
         sampleRate: kSampleRate,
         numChannels: kChannels,
         autoGain: true,
-        androidConfig: AndroidRecordConfig(
-          audioSource: audioSource,
-        ),
+        androidConfig: AndroidRecordConfig(audioSource: audioSource),
       ),
     );
 
@@ -128,9 +127,7 @@ class AudioService {
         sampleRate: kSampleRate,
         numChannels: kChannels,
         autoGain: true,
-        androidConfig: AndroidRecordConfig(
-          audioSource: audioSource,
-        ),
+        androidConfig: AndroidRecordConfig(audioSource: audioSource),
       ),
     );
 

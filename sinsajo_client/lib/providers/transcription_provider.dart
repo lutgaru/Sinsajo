@@ -1,9 +1,11 @@
 // lib/providers/transcription_provider.dart
 
 import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
+
 import '../services/audio_service.dart';
 import '../services/local_wav_writer.dart';
 import '../services/web_session_recorder.dart';
@@ -22,9 +24,9 @@ class TranscriptionState {
 
   const TranscriptionState({
     this.isRecording = false,
-    this.isPaused    = false,
-    this.wsStatus    = WsStatus.disconnected,
-    this.segments    = const [],
+    this.isPaused = false,
+    this.wsStatus = WsStatus.disconnected,
+    this.segments = const [],
     this.error,
     this.serverModel,
     this.supportedLanguages,
@@ -34,44 +36,43 @@ class TranscriptionState {
   String get fullText => segments.join(' ');
 
   TranscriptionState copyWith({
-    bool?         isRecording,
-    bool?         isPaused,
-    WsStatus?     wsStatus,
+    bool? isRecording,
+    bool? isPaused,
+    WsStatus? wsStatus,
     List<String>? segments,
-    String?       error,
-    String?       serverModel,
+    String? error,
+    String? serverModel,
     List<String>? supportedLanguages,
-    String?       localAudioPath,
-    bool          clearError = false,
-    bool          clearLocalAudioPath = false,
-  }) =>
-      TranscriptionState(
-        isRecording: isRecording ?? this.isRecording,
-        isPaused:    isPaused    ?? this.isPaused,
-        wsStatus:    wsStatus    ?? this.wsStatus,
-        segments:    segments    ?? this.segments,
-        error:       clearError ? null : (error ?? this.error),
-        serverModel: serverModel ?? this.serverModel,
-        supportedLanguages: supportedLanguages ?? this.supportedLanguages,
-        localAudioPath: clearLocalAudioPath
-            ? null
-            : (localAudioPath ?? this.localAudioPath),
-      );
+    String? localAudioPath,
+    bool clearError = false,
+    bool clearLocalAudioPath = false,
+  }) => TranscriptionState(
+    isRecording: isRecording ?? this.isRecording,
+    isPaused: isPaused ?? this.isPaused,
+    wsStatus: wsStatus ?? this.wsStatus,
+    segments: segments ?? this.segments,
+    error: clearError ? null : (error ?? this.error),
+    serverModel: serverModel ?? this.serverModel,
+    supportedLanguages: supportedLanguages ?? this.supportedLanguages,
+    localAudioPath: clearLocalAudioPath
+        ? null
+        : (localAudioPath ?? this.localAudioPath),
+  );
 }
 
 class TranscriptionNotifier extends Notifier<TranscriptionState> {
-  late final WsService    _ws;
+  late final WsService _ws;
   late final AudioService _audio;
-  StreamSubscription?     _audioSub;
-  StreamSubscription?     _wsStatusSub;
-  StreamSubscription?     _wsMessageSub;
-  LocalWavWriter?         _localWav;
-  WebSessionRecorder?     _webRec;
+  StreamSubscription? _audioSub;
+  StreamSubscription? _wsStatusSub;
+  StreamSubscription? _wsMessageSub;
+  LocalWavWriter? _localWav;
+  WebSessionRecorder? _webRec;
 
   @override
   TranscriptionState build() {
     final settings = ref.read(settingsProvider);
-    _ws    = WsService(url: 'ws://${settings.ipAddress}:8765');
+    _ws = WsService(url: 'ws://${settings.ipAddress}:8765');
     _audio = AudioService();
 
     _ws.connect();
@@ -86,7 +87,7 @@ class TranscriptionNotifier extends Notifier<TranscriptionState> {
 
     _wsStatusSub = _ws.statusStream.listen((s) {
       final wasRecording = state.isRecording;
-      final wasPaused    = state.isPaused;
+      final wasPaused = state.isPaused;
       state = state.copyWith(wsStatus: s, clearError: s == WsStatus.connected);
 
       // The server drops all session state when it crashes/restarts. If we
@@ -105,9 +106,7 @@ class TranscriptionNotifier extends Notifier<TranscriptionState> {
         case 'partial':
         case 'final':
           if (msg.content.isNotEmpty) {
-            state = state.copyWith(
-              segments: [...state.segments, msg.content],
-            );
+            state = state.copyWith(segments: [...state.segments, msg.content]);
           }
           break;
         case 'error':
@@ -191,8 +190,9 @@ class TranscriptionNotifier extends Notifier<TranscriptionState> {
     _audio.gain = settings.micGain;
     String? localAudioError;
     void noteLocalError(String msg) {
-      localAudioError =
-          localAudioError == null ? msg : '$localAudioError\n$msg';
+      localAudioError = localAudioError == null
+          ? msg
+          : '$localAudioError\n$msg';
     }
 
     _localWav = await _maybeStartLocalWriter(settings, onError: noteLocalError);
@@ -216,7 +216,9 @@ class TranscriptionNotifier extends Notifier<TranscriptionState> {
     }
 
     _audioSub = _audio.chunks.listen((chunk) {
-      debugPrint('[Audio] → Enviando chunk: ${chunk.pcmBytes.length} bytes, isFinal=${chunk.isFinal}');
+      debugPrint(
+        '[Audio] → Enviando chunk: ${chunk.pcmBytes.length} bytes, isFinal=${chunk.isFinal}',
+      );
       _ws.sendAudioChunk(chunk.pcmBytes);
       // IOSink.add preserves order synchronously, so no chaining needed
       // and RAM stays flat (bytes go straight to the OS buffer).
@@ -258,7 +260,9 @@ class TranscriptionNotifier extends Notifier<TranscriptionState> {
       endSpeechPadFrames: settings.endSpeechPadFrames,
     );
     _audioSub = _audio.chunks.listen((chunk) {
-      debugPrint('[Audio] → Enviando chunk: ${chunk.pcmBytes.length} bytes, isFinal=${chunk.isFinal}');
+      debugPrint(
+        '[Audio] → Enviando chunk: ${chunk.pcmBytes.length} bytes, isFinal=${chunk.isFinal}',
+      );
       _ws.sendAudioChunk(chunk.pcmBytes);
       unawaited(_localWav?.append(chunk.pcmBytes));
     });
@@ -401,5 +405,5 @@ class TranscriptionNotifier extends Notifier<TranscriptionState> {
 
 final transcriptionProvider =
     NotifierProvider<TranscriptionNotifier, TranscriptionState>(
-  TranscriptionNotifier.new,
-);
+      TranscriptionNotifier.new,
+    );

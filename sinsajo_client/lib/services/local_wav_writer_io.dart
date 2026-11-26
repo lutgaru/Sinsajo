@@ -24,13 +24,12 @@ Future<LocalWavWriter> createWriter({
   int sampleRate = 16000,
   int channels = 1,
   int bitsPerSample = 16,
-}) async =>
-    _IoLocalWavWriter(
-      file: File('$directoryPath/$fileName'),
-      sampleRate: sampleRate,
-      channels: channels,
-      bitsPerSample: bitsPerSample,
-    );
+}) async => _IoLocalWavWriter(
+  file: File('$directoryPath/$fileName'),
+  sampleRate: sampleRate,
+  channels: channels,
+  bitsPerSample: bitsPerSample,
+);
 
 class _IoLocalWavWriter implements LocalWavWriter {
   _IoLocalWavWriter({
@@ -96,9 +95,7 @@ class _IoLocalWavWriter implements LocalWavWriter {
       await sink.flush();
       await sink.close();
       await _assembleWav();
-      debugPrint(
-        '[LocalAudio] 💾 Saved ${file.path} (${_dataBytes}B PCM)',
-      );
+      debugPrint('[LocalAudio] 💾 Saved ${file.path} (${_dataBytes}B PCM)');
     } catch (e) {
       debugPrint('[LocalAudio] ⚠️ finalize failed: $e');
     }

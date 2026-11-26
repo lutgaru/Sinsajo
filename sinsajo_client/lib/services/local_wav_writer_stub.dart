@@ -10,8 +10,7 @@ Future<LocalWavWriter> createWriter({
   int sampleRate = 16000,
   int channels = 1,
   int bitsPerSample = 16,
-}) async =>
-    _NoopLocalWavWriter();
+}) async => _NoopLocalWavWriter();
 
 class _NoopLocalWavWriter implements LocalWavWriter {
   @override
